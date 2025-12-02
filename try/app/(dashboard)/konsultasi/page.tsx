@@ -8,6 +8,7 @@ import { Card, Badge } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
 import { ChatMessage } from '@/lib/types';
+import ReactMarkdown from 'react-markdown';
 import {
   Bot,
   Send,
@@ -39,11 +40,11 @@ export default function KonsultasiPage() {
 
   // Business context for AI
   const businessContext = `
-Data Bisnis Toko "${settings.storeName}":
+Data Bisnis "${settings.businessName || 'Toko Saya'}":
 - Total Penjualan 30 hari: ${formatCurrency(totalRevenue)}
 - Rata-rata Harian: ${formatCurrency(totalRevenue / 30)}
 - Total Produk: ${products.length}
-- Produk Terlaris: ${topProducts.map((p) => p.productName).join(', ')}
+- Produk Terlaris: ${topProducts.map((p) => p.productName).join(', ') || 'Belum ada data'}
 - Produk Stok Rendah: ${lowStockProducts.map((p) => p.name).join(', ') || 'Tidak ada'}
   `.trim();
 
@@ -51,10 +52,12 @@ Data Bisnis Toko "${settings.storeName}":
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    const userInput = input.trim(); // Simpan input sebelum di-clear
+    
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
-      content: input.trim(),
+      content: userInput,
       timestamp: new Date(),
     };
     addChatMessage(userMessage);
@@ -68,13 +71,17 @@ Data Bisnis Toko "${settings.storeName}":
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: input,
+            message: userInput, // Gunakan userInput, bukan input
             context: businessContext,
             apiKey: settings.nvidiaApiKey,
           }),
         });
 
         const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'API Error');
+        }
 
         const aiMessage: ChatMessage = {
           id: `msg-${Date.now()}-ai`,
@@ -84,18 +91,21 @@ Data Bisnis Toko "${settings.storeName}":
         };
         addChatMessage(aiMessage);
       } catch (error) {
+        console.error('Chat error:', error);
         const errorMessage: ChatMessage = {
           id: `msg-${Date.now()}-error`,
           role: 'assistant',
-          content: 'Maaf, terjadi kesalahan koneksi. Silakan coba lagi.',
+          content: `Maaf, terjadi kesalahan: ${error instanceof Error ? error.message : 'Koneksi gagal'}. Silakan coba lagi atau periksa API key di Pengaturan.`,
           timestamp: new Date(),
         };
         addChatMessage(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
     } else {
       // Fallback local responses
       setTimeout(() => {
-        const responses = generateLocalResponse(input, {
+        const responses = generateLocalResponse(userInput, {
           totalRevenue,
           topProducts,
           lowStockProducts,
@@ -112,10 +122,7 @@ Data Bisnis Toko "${settings.storeName}":
         addChatMessage(aiMessage);
         setIsLoading(false);
       }, 1500);
-      return;
     }
-
-    setIsLoading(false);
   };
 
   // Quick prompts
@@ -191,7 +198,21 @@ Data Bisnis Toko "${settings.storeName}":
                           : 'bg-slate-100 text-slate-800 rounded-tl-sm'
                       }`}
                     >
-                      <pre className="whitespace-pre-wrap font-sans text-sm">{msg.content}</pre>
+                      {msg.role === 'user' ? (
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      ) : (
+                        <div className="prose prose-sm prose-slate max-w-none 
+                          prose-headings:text-slate-900 prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-2
+                          prose-p:text-slate-700 prose-p:my-1
+                          prose-strong:text-slate-900 prose-strong:font-semibold
+                          prose-ul:my-2 prose-ul:pl-4 prose-li:my-0.5 prose-li:text-slate-700
+                          prose-ol:my-2 prose-ol:pl-4
+                          prose-code:bg-slate-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-slate-800 prose-code:text-xs
+                          prose-pre:bg-slate-800 prose-pre:text-slate-100 prose-pre:rounded-lg prose-pre:p-3
+                          prose-a:text-blue-600 prose-a:underline">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

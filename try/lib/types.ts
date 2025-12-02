@@ -78,6 +78,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  image?: string;
   role: 'admin' | 'staff' | 'viewer';
   createdAt: Date;
 }
@@ -92,16 +93,22 @@ export interface ActivityLog {
 }
 
 export interface BusinessSettings {
-  storeName: string;
-  storeAddress: string;
+  businessName: string;
+  businessType: 'retail' | 'wholesale' | 'fnb' | 'service' | 'other';
+  storeName?: string;
+  storeAddress?: string;
   timezone: string;
   currency: string;
-  categories: string[];
-  units: string[];
-  minStockAlert: number;
+  categories?: string[];
+  units?: string[];
+  lowStockThreshold: number;
+  minStockAlert?: number;
   nvidiaApiKey: string;
-  emailNotifications: boolean;
-  notificationEmail: string;
+  enableNotifications: boolean;
+  enableAutoReports: boolean;
+  reportFrequency: 'daily' | 'weekly' | 'monthly';
+  emailNotifications?: boolean;
+  notificationEmail?: string;
 }
 
 export interface ChatMessage {

@@ -15,8 +15,11 @@ import {
   X,
   Bot,
   FileText,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -32,6 +35,12 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { data: session, status } = useSession();
+
+  // Hide sidebar on login page
+  if (pathname === '/login') {
+    return null;
+  }
 
   return (
     <>
@@ -88,17 +97,54 @@ export function Sidebar() {
             })}
           </nav>
 
-          {/* User info */}
+          {/* User info & Logout */}
           <div className="px-4 py-4 border-t border-slate-700">
-            <div className="flex items-center gap-3 px-4 py-2">
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="text-sm font-medium">A</span>
+            {status === 'loading' ? (
+              <div className="flex items-center gap-3 px-4 py-2">
+                <div className="w-10 h-10 rounded-full bg-slate-700 animate-pulse" />
+                <div className="flex-1">
+                  <div className="h-4 bg-slate-700 rounded animate-pulse mb-1 w-20" />
+                  <div className="h-3 bg-slate-700 rounded animate-pulse w-24" />
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium">Admin</p>
-                <p className="text-xs text-slate-400">Administrator</p>
-              </div>
-            </div>
+            ) : session?.user ? (
+              <>
+                <div className="flex items-center gap-3 px-4 py-2">
+                  {session.user.image ? (
+                    <img 
+                      src={session.user.image} 
+                      alt={session.user.name || 'User'} 
+                      className="w-10 h-10 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                      <span className="text-sm font-medium">
+                        {session.user.name?.charAt(0) || 'U'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{session.user.name}</p>
+                    <p className="text-xs text-slate-400 truncate">{session.user.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  className="flex items-center gap-3 px-4 py-3 mt-2 w-full rounded-lg text-slate-300 hover:bg-red-600/20 hover:text-red-400 transition-colors"
+                >
+                  <LogOut size={20} />
+                  <span>Keluar</span>
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <User size={20} />
+                <span>Masuk</span>
+              </Link>
+            )}
           </div>
         </div>
       </aside>

@@ -4,19 +4,24 @@ export async function POST(request: NextRequest) {
   try {
     const { message, context, apiKey } = await request.json();
 
-    if (!apiKey) {
+    // Use provided API key or fall back to environment variable
+    const nvidiaApiKey = apiKey || process.env.NVIDIA_API_KEY;
+
+    if (!nvidiaApiKey) {
       return NextResponse.json(
-        { error: 'API key not configured' },
+        { error: 'API key tidak dikonfigurasi. Silakan tambahkan di Pengaturan.' },
         { status: 400 }
       );
     }
+
+    console.log('Sending request to NVIDIA NIM API...');
 
     // NVIDIA NIM API call
     const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${nvidiaApiKey}`,
       },
       body: JSON.stringify({
         model: 'meta/llama-3.1-8b-instruct',
@@ -45,9 +50,24 @@ Berikan jawaban dalam Bahasa Indonesia yang mudah dipahami. Fokus pada:
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('NVIDIA API Error:', errorData);
+      console.error('NVIDIA API Error:', response.status, errorData);
+      
+      if (response.status === 401) {
+        return NextResponse.json(
+          { error: 'API key tidak valid. Silakan periksa kembali di Pengaturan.' },
+          { status: 401 }
+        );
+      }
+      
+      if (response.status === 429) {
+        return NextResponse.json(
+          { error: 'Terlalu banyak permintaan. Silakan coba lagi dalam beberapa saat.' },
+          { status: 429 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to get response from AI' },
+        { error: `Gagal mendapatkan respons dari AI (${response.status})` },
         { status: response.status }
       );
     }
@@ -55,11 +75,12 @@ Berikan jawaban dalam Bahasa Indonesia yang mudah dipahami. Fokus pada:
     const data = await response.json();
     const aiResponse = data.choices?.[0]?.message?.content || 'Maaf, tidak dapat memproses permintaan.';
 
+    console.log('NVIDIA NIM API response received successfully');
     return NextResponse.json({ response: aiResponse });
   } catch (error) {
     console.error('Chat API Error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Terjadi kesalahan server. Silakan coba lagi.' },
       { status: 500 }
     );
   }
