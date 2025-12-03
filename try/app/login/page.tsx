@@ -2,18 +2,21 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { BarChart3, ShoppingBag, TrendingUp, Bot, Chrome } from "lucide-react";
+import { BarChart3, ShoppingBag, TrendingUp, Bot, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
+    setError("");
     try {
       await signIn("google", { callbackUrl: "/" });
     } catch (error) {
-      console.error("Login error:", error);
-    } finally {
+      setError("Google login gagal. Pastikan kredensial sudah dikonfigurasi.");
       setIsLoading(false);
     }
   };
@@ -86,16 +89,24 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-slate-800 mb-2">Selamat Datang!</h2>
-              <p className="text-slate-500">Masuk untuk mengakses dashboard Anda</p>
+              <p className="text-slate-500 text-sm">Masuk untuk mengakses dashboard Anda</p>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm font-medium">{error}</p>
+              </div>
+            )}
+
+            {/* Google Login Button */}
             <button
               onClick={handleGoogleLogin}
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-slate-700 font-medium py-3 px-4 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -116,15 +127,8 @@ export default function LoginPage() {
                   />
                 </svg>
               )}
-              {isLoading ? "Memproses..." : "Masuk dengan Google"}
+              {isLoading ? "Sedang Login..." : "Masuk dengan Google"}
             </button>
-
-            <p className="text-center text-slate-400 text-sm mt-6">
-              Dengan masuk, Anda menyetujui{" "}
-              <a href="#" className="text-blue-600 hover:underline">Syarat & Ketentuan</a>
-              {" "}dan{" "}
-              <a href="#" className="text-blue-600 hover:underline">Kebijakan Privasi</a>
-            </p>
           </div>
 
           <p className="text-center text-slate-400 text-sm mt-6 lg:hidden">

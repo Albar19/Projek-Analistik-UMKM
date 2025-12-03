@@ -44,10 +44,6 @@ export default function PengaturanPage() {
     minStockAlert: settings.minStockAlert,
   });
 
-  const [apiForm, setApiForm] = useState({
-    nvidiaApiKey: settings.nvidiaApiKey,
-  });
-
   const [notifForm, setNotifForm] = useState({
     emailNotifications: settings.emailNotifications,
     notificationEmail: settings.notificationEmail,
@@ -61,7 +57,6 @@ export default function PengaturanPage() {
       ...storeForm,
       ...categoryForm,
       minStockAlert: stockForm.minStockAlert,
-      nvidiaApiKey: apiForm.nvidiaApiKey,
       emailNotifications: notifForm.emailNotifications,
       notificationEmail: notifForm.notificationEmail,
     });
@@ -112,7 +107,6 @@ export default function PengaturanPage() {
     { id: 'store', label: 'Info Toko', icon: Store },
     { id: 'products', label: 'Produk', icon: Database },
     { id: 'notifications', label: 'Notifikasi', icon: Bell },
-    { id: 'api', label: 'API NVIDIA', icon: Key },
     { id: 'security', label: 'Keamanan', icon: Shield },
   ];
 
@@ -336,54 +330,6 @@ export default function PengaturanPage() {
                         Notifikasi WhatsApp dan email scheduler akan segera tersedia.
                       </p>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* API Settings */}
-          {activeTab === 'api' && (
-            <Card>
-              <h2 className="text-lg font-semibold text-slate-900 mb-6">Konfigurasi API NVIDIA NIM</h2>
-              <div className="space-y-4">
-                <Input
-                  label="API Key"
-                  type="password"
-                  value={apiForm.nvidiaApiKey}
-                  onChange={(e) => setApiForm({ nvidiaApiKey: e.target.value })}
-                  placeholder="nvapi-xxxxxxxxxxxx"
-                />
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-800 mb-2">Cara mendapatkan API Key:</h4>
-                  <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-                    <li>Buka build.nvidia.com</li>
-                    <li>Daftar atau login dengan akun NVIDIA</li>
-                    <li>Pilih model LLM yang ingin digunakan</li>
-                    <li>Klik "Get API Key"</li>
-                    <li>Copy dan paste API key di sini</li>
-                  </ol>
-                </div>
-
-                <div
-                  className={`p-4 rounded-lg border ${
-                    apiForm.nvidiaApiKey
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {apiForm.nvidiaApiKey ? (
-                      <>
-                        <div className="w-2 h-2 bg-green-500 rounded-full" />
-                        <span className="text-green-700">API Key terkonfigurasi</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-2 h-2 bg-slate-400 rounded-full" />
-                        <span className="text-slate-600">API Key belum dikonfigurasi (mode offline)</span>
-                      </>
-                    )}
                   </div>
                 </div>
               </div>
