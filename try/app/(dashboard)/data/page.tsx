@@ -27,6 +27,7 @@ export default function DataPage() {
   const {
     sales,
     products,
+    settings,
     activityLogs,
     addSale,
     addManySales,
@@ -36,6 +37,11 @@ export default function DataPage() {
     updateProduct,
     deleteProduct,
   } = useStore();
+
+  // Get categories and units from settings
+  const categories = settings.categories || ['Makanan', 'Minuman', 'Snack', 'Lainnya'];
+  const units = settings.units || ['Pcs', 'Box', 'Kg', 'Liter'];
+  const defaultMinStock = settings.minStockAlert || settings.lowStockThreshold || 10;
 
   const [activeTab, setActiveTab] = useState<'sales' | 'products' | 'logs'>('sales');
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +64,7 @@ export default function DataPage() {
     costPrice: '',
     stock: '',
     minStock: '',
-    unit: 'pcs',
+    unit: '',
   });
 
   // Filtered data
@@ -116,12 +122,12 @@ export default function DataPage() {
     const newProduct: Product = {
       id: `prod-${Date.now()}`,
       name: productForm.name,
-      category: productForm.category || 'Lainnya',
+      category: productForm.category || categories[0] || 'Lainnya',
       price: parseFloat(productForm.price),
       costPrice: parseFloat(productForm.costPrice) || 0,
       stock: parseInt(productForm.stock) || 0,
-      minStock: parseInt(productForm.minStock) || 10,
-      unit: productForm.unit,
+      minStock: parseInt(productForm.minStock) || defaultMinStock,
+      unit: productForm.unit || units[0] || 'Pcs',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -134,7 +140,7 @@ export default function DataPage() {
       costPrice: '',
       stock: '',
       minStock: '',
-      unit: 'pcs',
+      unit: '',
     });
     setShowAddModal(false);
   };
@@ -492,8 +498,12 @@ export default function DataPage() {
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                 />
-                <Input
+                <Select
                   label="Kategori"
+                  options={[
+                    { value: '', label: 'Pilih kategori...' },
+                    ...categories.map((cat) => ({ value: cat, label: cat })),
+                  ]}
                   value={productForm.category}
                   onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                 />
@@ -523,16 +533,14 @@ export default function DataPage() {
                     type="number"
                     value={productForm.minStock}
                     onChange={(e) => setProductForm({ ...productForm, minStock: e.target.value })}
+                    placeholder={defaultMinStock.toString()}
                   />
                 </div>
                 <Select
-                  label="Unit"
+                  label="Satuan"
                   options={[
-                    { value: 'pcs', label: 'pcs' },
-                    { value: 'box', label: 'box' },
-                    { value: 'kg', label: 'kg' },
-                    { value: 'botol', label: 'botol' },
-                    { value: 'liter', label: 'liter' },
+                    { value: '', label: 'Pilih satuan...' },
+                    ...units.map((unit) => ({ value: unit, label: unit })),
                   ]}
                   value={productForm.unit}
                   onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
