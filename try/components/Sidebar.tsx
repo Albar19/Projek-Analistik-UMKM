@@ -71,7 +71,7 @@ export function Sidebar() {
           {/* Logo */}
           <div className="flex items-center gap-2 px-6 py-5 border-b border-slate-700">
             <BarChart3 className="w-8 h-8 text-blue-400" />
-            <span className="text-xl font-bold">SalesAI</span>
+            <span className="text-xl font-bold">Analistik Penjualan</span>
           </div>
 
           {/* Navigation */}

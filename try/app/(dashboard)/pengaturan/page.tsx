@@ -27,26 +27,26 @@ export default function PengaturanPage() {
 
   // Form states
   const [storeForm, setStoreForm] = useState({
-    storeName: settings.storeName,
-    storeAddress: settings.storeAddress,
-    timezone: settings.timezone,
-    currency: settings.currency,
+    storeName: settings.storeName || settings.businessName || '',
+    storeAddress: settings.storeAddress || '',
+    timezone: settings.timezone || 'Asia/Jakarta',
+    currency: settings.currency || 'IDR',
   });
 
   const [categoryForm, setCategoryForm] = useState({
-    categories: settings.categories,
-    units: settings.units,
+    categories: settings.categories || ['Makanan', 'Minuman', 'Snack', 'Lainnya'],
+    units: settings.units || ['Pcs', 'Box', 'Kg', 'Liter'],
     newCategory: '',
     newUnit: '',
   });
 
   const [stockForm, setStockForm] = useState({
-    minStockAlert: settings.minStockAlert,
+    minStockAlert: settings.minStockAlert || settings.lowStockThreshold || 10,
   });
 
   const [notifForm, setNotifForm] = useState({
-    emailNotifications: settings.emailNotifications,
-    notificationEmail: settings.notificationEmail,
+    emailNotifications: settings.emailNotifications || settings.enableNotifications || false,
+    notificationEmail: settings.notificationEmail || '',
   });
 
   // Save handlers

@@ -30,7 +30,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
               <BarChart3 className="w-7 h-7 text-white" />
             </div>
-            <span className="text-2xl font-bold text-white">SalesAI</span>
+            <span className="text-2xl font-bold text-white">Analistik Penjualan</span>
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">
             Dashboard Penjualan UMKM dengan AI
@@ -71,7 +71,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-blue-200 text-sm">
-          © 2024 SalesAI. Solusi Digital untuk UMKM Indonesia.
+          © 2024 Analistik Penjualan. Solusi Digital untuk UMKM Indonesia.
         </p>
       </div>
 
@@ -83,7 +83,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center">
               <BarChart3 className="w-7 h-7 text-white" />
             </div>
-            <span className="text-2xl font-bold text-slate-800">SalesAI</span>
+            <span className="text-2xl font-bold text-slate-800">Analistik Penjualan</span>
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -132,7 +132,7 @@ export default function LoginPage() {
           </div>
 
           <p className="text-center text-slate-400 text-sm mt-6 lg:hidden">
-            © 2024 SalesAI. Solusi Digital untuk UMKM Indonesia.
+            © 2024 Analistik Penjualan. Solusi Digital untuk UMKM Indonesia.
           </p>
         </div>
       </div>
