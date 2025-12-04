@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { calculateDailySales, calculateProductSales } from '@/lib/data';
 import {
@@ -31,6 +31,7 @@ import {
 
 export default function LaporanPage() {
   const { sales, products, settings } = useStore();
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   // Calculate data
   const { start, end } = getDateRange(30);
@@ -125,6 +126,155 @@ export default function LaporanPage() {
     saveAs(blob, `laporan-${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  // Send report via email
+  const handleSendEmail = async () => {
+    if (!settings.notificationEmail) {
+      alert('Silakan atur email notifikasi di pengaturan terlebih dahulu');
+      return;
+    }
+
+    setIsEmailSending(true);
+    try {
+      // Generate HTML report
+      const reportHTML = `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: 0 auto;">
+          <h2 style="color: #1e40af; border-bottom: 3px solid #1e40af; padding-bottom: 10px;">
+            📮 Laporan Penjualan
+          </h2>
+          
+          <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Toko:</strong> ${settings.storeName}</p>
+            <p><strong>Periode:</strong> ${start.toLocaleDateString('id-ID')} - ${end.toLocaleDateString('id-ID')}</p>
+          </div>
+
+          <h3 style="color: #1e40af; margin-top: 20px;">📊 Ringkasan</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr style="background-color: #e0e7ff;">
+              <td style="padding: 10px; border: 1px solid #c7d2fe;"><strong>Total Penjualan</strong></td>
+              <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;"><strong>${formatCurrency(totalRevenue)}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #c7d2fe;">Total Unit Terjual</td>
+              <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${formatNumber(totalQuantity)}</td>
+            </tr>
+            <tr style="background-color: #f0f9ff;">
+              <td style="padding: 10px; border: 1px solid #c7d2fe;">Rata-rata Harian</td>
+              <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${formatCurrency(totalRevenue / 30)}</td>
+            </tr>
+          </table>
+
+          <h3 style="color: #1e40af; margin-top: 20px;">🏆 Top 5 Produk Terlaris</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #e0e7ff;">
+                <th style="padding: 10px; border: 1px solid #c7d2fe; text-align: left;">Produk</th>
+                <th style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">Qty</th>
+                <th style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${productSales.slice(0, 5).map((p) => `
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #c7d2fe;">${p.productName}</td>
+                  <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${formatNumber(p.totalQuantity)}</td>
+                  <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${formatCurrency(p.totalRevenue)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <h3 style="color: #1e40af; margin-top: 20px;">📈 Prediksi Minggu Depan</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr style="background-color: #f0f9ff;">
+              <td style="padding: 10px; border: 1px solid #c7d2fe;">Prediksi Penjualan</td>
+              <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${formatCurrency(prediction.predictedValue)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #c7d2fe;">Tingkat Kepercayaan</td>
+              <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${prediction.confidenceLevel.toFixed(0)}%</td>
+            </tr>
+            <tr style="background-color: #f0f9ff;">
+              <td style="padding: 10px; border: 1px solid #c7d2fe;">Tren</td>
+              <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${prediction.trend === 'up' ? '📈 Naik' : prediction.trend === 'down' ? '📉 Turun' : '➡️ Stabil'}</td>
+            </tr>
+          </table>
+
+          <h3 style="color: #1e40af; margin-top: 20px;">⚠️ Stok Perlu Perhatian</h3>
+          ${stockAnalysis.filter((s) => s.status === 'critical' || s.status === 'low').length > 0 ? `
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #e0e7ff;">
+                  <th style="padding: 10px; border: 1px solid #c7d2fe; text-align: left;">Produk</th>
+                  <th style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">Stok</th>
+                  <th style="padding: 10px; border: 1px solid #c7d2fe; text-align: left;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${stockAnalysis
+                  .filter((s) => s.status === 'critical' || s.status === 'low')
+                  .map((s) => `
+                    <tr>
+                      <td style="padding: 10px; border: 1px solid #c7d2fe;">${s.productName}</td>
+                      <td style="padding: 10px; border: 1px solid #c7d2fe; text-align: right;">${s.currentStock}</td>
+                      <td style="padding: 10px; border: 1px solid #c7d2fe; color: ${s.status === 'critical' ? '#dc2626' : '#ea580c'}; font-weight: bold;">
+                        ${s.status === 'critical' ? '🔴 Kritis' : '🟠 Rendah'}
+                      </td>
+                    </tr>
+                  `).join('')}
+              </tbody>
+            </table>
+          ` : '<p style="color: #10b981; font-weight: bold;">✅ Semua stok dalam kondisi baik</p>'}
+
+          <h3 style="color: #1e40af; margin-top: 20px;">💡 Insight AI</h3>
+          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+            ${insights.map((i) => `
+              <div style="margin-bottom: 10px;">
+                <strong>${i.title}</strong>
+                <p style="margin: 5px 0; color: #555;">${i.description}</p>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #999; font-size: 12px;">
+            <p>Laporan ini dikirim secara otomatis oleh sistem Analistik UMKM</p>
+            <p>Waktu: ${new Date().toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+      `;
+
+      // Call email API
+      const response = await fetch('/api/email/send-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipientEmail: settings.notificationEmail,
+          reportHTML,
+          reportSubject: `Laporan Penjualan - ${settings.storeName} (${new Date().toLocaleDateString('id-ID')})`,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Show detailed error message
+        if (data.details) {
+          throw new Error(`${data.error}: ${data.details}`);
+        }
+        throw new Error(data.error || 'Gagal mengirim email');
+      }
+
+      alert(`✅ Email berhasil dikirim ke ${settings.notificationEmail}`);
+    } catch (error) {
+      console.error('Email error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Kesalahan tidak diketahui';
+      alert(`❌ Gagal mengirim email:\n\n${errorMessage}\n\nPastikan EMAIL_USER dan EMAIL_PASSWORD sudah dikonfigurasi di file .env`);
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -134,9 +284,9 @@ export default function LaporanPage() {
           <p className="text-slate-500 mt-1">Laporan lengkap penjualan dan insight</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline">
+          <Button onClick={handleSendEmail} disabled={isEmailSending}>
             <Mail className="w-4 h-4 mr-2" />
-            Kirim Email
+            {isEmailSending ? 'Mengirim...' : 'Kirim Email'}
           </Button>
           <Button onClick={handleExportReport}>
             <Download className="w-4 h-4 mr-2" />
@@ -254,7 +404,7 @@ export default function LaporanPage() {
             Prediksi Minggu Depan
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg p-4 text-white">
+            <div className="bg-linear-to-br from-blue-500 to-indigo-600 rounded-lg p-4 text-white">
               <p className="text-sm opacity-80">Prediksi Penjualan</p>
               <p className="text-2xl font-bold">{formatCurrency(prediction.predictedValue)}</p>
             </div>
