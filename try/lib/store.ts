@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, Sale, BusinessSettings, ChatMessage, ActivityLog, User } from './types';
+import { Product, Sale, BusinessSettings, ChatMessage, ChatSession, ActivityLog, User } from './types';
 
 // Default NVIDIA API Key
 const NVIDIA_API_KEY = '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';
@@ -20,6 +20,7 @@ const getEmptyState = () => ({
     nvidiaApiKey: NVIDIA_API_KEY,
   } as BusinessSettings,
   chatHistory: [] as ChatMessage[],
+  chatSessions: [] as ChatSession[],
   activityLogs: [] as ActivityLog[],
 });
 
@@ -32,6 +33,8 @@ interface AppState {
   sales: Sale[];
   settings: BusinessSettings;
   chatHistory: ChatMessage[];
+  chatSessions: ChatSession[];
+  currentChatSessionId: string | null;
   activityLogs: ActivityLog[];
   currentUser: User | null;
   
@@ -57,6 +60,14 @@ interface AppState {
   // Actions - Chat
   addChatMessage: (message: ChatMessage) => void;
   clearChatHistory: () => void;
+  
+  // Actions - Chat Sessions
+  createChatSession: (title?: string) => string;
+  addMessageToSession: (sessionId: string, message: ChatMessage) => void;
+  saveCurrentSession: () => void;
+  loadChatSession: (sessionId: string) => void;
+  deleteChatSession: (sessionId: string) => void;
+  setCurrentChatSession: (sessionId: string | null) => void;
   
   // Actions - Activity Log
   addActivityLog: (log: Omit<ActivityLog, 'id' | 'timestamp'>) => void;
@@ -110,6 +121,7 @@ const saveUserData = (userId: string, data: Partial<AppState>) => {
       sales: data.sales,
       settings: data.settings,
       chatHistory: data.chatHistory,
+      chatSessions: data.chatSessions,
       activityLogs: data.activityLogs,
     },
     version: 1,
@@ -123,6 +135,8 @@ export const useStore = create<AppState>()((set, get) => ({
   sales: [],
   settings: getEmptyState().settings,
   chatHistory: [],
+  chatSessions: [],
+  currentChatSessionId: null,
   activityLogs: [],
   currentUser: null,
   
@@ -148,6 +162,7 @@ export const useStore = create<AppState>()((set, get) => ({
         sales: existingData.sales || [],
         settings: existingData.settings || getEmptyState().settings,
         chatHistory: existingData.chatHistory || [],
+        chatSessions: existingData.chatSessions || [],
         activityLogs: existingData.activityLogs || [],
       });
     } else {
@@ -215,6 +230,7 @@ export const useStore = create<AppState>()((set, get) => ({
             sales: existingData.sales || [],
             settings: existingData.settings || getEmptyState().settings,
             chatHistory: existingData.chatHistory || [],
+            chatSessions: existingData.chatSessions || [],
             activityLogs: existingData.activityLogs || [],
           });
           console.log('✅ Data loaded from localStorage (MySQL empty)');
@@ -242,6 +258,7 @@ export const useStore = create<AppState>()((set, get) => ({
           sales: existingData.sales || [],
           settings: existingData.settings || getEmptyState().settings,
           chatHistory: existingData.chatHistory || [],
+          chatSessions: existingData.chatSessions || [],
           activityLogs: existingData.activityLogs || [],
         });
         console.log('✅ Data loaded from localStorage (MySQL failed)');
@@ -427,6 +444,94 @@ export const useStore = create<AppState>()((set, get) => ({
       }
       return { chatHistory: [] };
     });
+  },
+  
+  // Chat Sessions
+  createChatSession: (title?: string) => {
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date();
+    const newSession: ChatSession = {
+      id: sessionId,
+      title: title || `Chat ${now.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}`,
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+      isActive: true,
+    };
+    
+    set((state) => {
+      const newSessions = [...state.chatSessions, newSession];
+      if (state.currentUserId) {
+        saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
+      }
+      return { chatSessions: newSessions, currentChatSessionId: sessionId };
+    });
+    
+    return sessionId;
+  },
+  
+  addMessageToSession: (sessionId: string, message: ChatMessage) => {
+    set((state) => {
+      const newSessions = state.chatSessions.map((session) =>
+        session.id === sessionId
+          ? { ...session, messages: [...session.messages, message], updatedAt: new Date() }
+          : session
+      );
+      if (state.currentUserId) {
+        saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
+      }
+      return { chatSessions: newSessions };
+    });
+  },
+  
+  saveCurrentSession: () => {
+    const state = get();
+    if (state.currentChatSessionId && state.chatHistory.length > 0) {
+      // Generate title from first user message
+      const firstUserMessage = state.chatHistory.find((msg) => msg.role === 'user');
+      const title = firstUserMessage
+        ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
+        : `Chat ${new Date().toLocaleDateString('id-ID')}`;
+      
+      set((state) => {
+        const newSessions = state.chatSessions.map((session) =>
+          session.id === state.currentChatSessionId
+            ? { ...session, messages: state.chatHistory, title, updatedAt: new Date(), isActive: false }
+            : session
+        );
+        if (state.currentUserId) {
+          saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
+        }
+        return { chatSessions: newSessions };
+      });
+    }
+  },
+  
+  loadChatSession: (sessionId: string) => {
+    set((state) => {
+      const session = state.chatSessions.find((s) => s.id === sessionId);
+      if (session) {
+        return { 
+          currentChatSessionId: sessionId,
+          chatHistory: session.messages,
+        };
+      }
+      return {};
+    });
+  },
+  
+  deleteChatSession: (sessionId: string) => {
+    set((state) => {
+      const newSessions = state.chatSessions.filter((s) => s.id !== sessionId);
+      if (state.currentUserId) {
+        saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
+      }
+      return { chatSessions: newSessions };
+    });
+  },
+  
+  setCurrentChatSession: (sessionId: string | null) => {
+    set({ currentChatSessionId: sessionId });
   },
   
   // Activity Log

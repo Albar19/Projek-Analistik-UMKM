@@ -17,6 +17,7 @@ import {
   FileText,
   LogOut,
   User,
+  History,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Prediksi', href: '/prediksi', icon: TrendingUp },
   { name: 'Stok & Produk', href: '/stok', icon: Package },
   { name: 'Konsultasi AI', href: '/konsultasi', icon: MessageSquare },
+  { name: 'Riwayat Konsultasi', href: '/riwayat', icon: History },
   { name: 'Manajemen Data', href: '/data', icon: Database },
   { name: 'Laporan', href: '/laporan', icon: FileText },
   { name: 'Pengaturan', href: '/pengaturan', icon: Settings },

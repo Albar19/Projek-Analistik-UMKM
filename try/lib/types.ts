@@ -118,6 +118,15 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;
+}
+
 export interface ReportData {
   period: string;
   totalSales: number;

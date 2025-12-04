@@ -18,13 +18,47 @@ import {
   RefreshCw,
   Settings,
   AlertCircle,
+  History,
+  Plus,
 } from 'lucide-react';
 
 export default function KonsultasiPage() {
-  const { sales, products, settings, chatHistory, addChatMessage, clearChatHistory } = useStore();
+  const { 
+    sales, 
+    products, 
+    settings, 
+    chatHistory, 
+    addChatMessage, 
+    clearChatHistory,
+    createChatSession,
+    addMessageToSession,
+    saveCurrentSession,
+    currentChatSessionId,
+  } = useStore();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize session on component mount
+  useEffect(() => {
+    if (!currentChatSessionId) {
+      createChatSession();
+    }
+  }, [currentChatSessionId, createChatSession]);
+
+  // Save session when leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveCurrentSession();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      saveCurrentSession();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [saveCurrentSession]);
 
   // Calculate business context
   const dailySales = calculateDailySales(sales);
@@ -61,6 +95,9 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
       timestamp: new Date(),
     };
     addChatMessage(userMessage);
+    if (currentChatSessionId) {
+      addMessageToSession(currentChatSessionId, userMessage);
+    }
     setInput('');
     setIsLoading(true);
 
@@ -90,6 +127,9 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
           timestamp: new Date(),
         };
         addChatMessage(aiMessage);
+        if (currentChatSessionId) {
+          addMessageToSession(currentChatSessionId, aiMessage);
+        }
       } catch (error) {
         console.error('Chat error:', error);
         const errorMessage: ChatMessage = {
@@ -99,6 +139,9 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
           timestamp: new Date(),
         };
         addChatMessage(errorMessage);
+        if (currentChatSessionId) {
+          addMessageToSession(currentChatSessionId, errorMessage);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -120,6 +163,9 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
           timestamp: new Date(),
         };
         addChatMessage(aiMessage);
+        if (currentChatSessionId) {
+          addMessageToSession(currentChatSessionId, aiMessage);
+        }
         setIsLoading(false);
       }, 1500);
     }
@@ -134,6 +180,12 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
     'Rekomendasi bundling produk',
     'Strategi untuk meningkatkan keuntungan',
   ];
+
+  const handleNewSession = () => {
+    saveCurrentSession();
+    createChatSession();
+    clearChatHistory();
+  };
 
   return (
     <div className="space-y-6 h-full">
@@ -150,6 +202,14 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
               API belum dikonfigurasi
             </Badge>
           )}
+          <Button variant="outline" onClick={() => window.location.href = '/riwayat'}>
+            <History className="w-4 h-4 mr-2" />
+            Riwayat
+          </Button>
+          <Button variant="outline" onClick={handleNewSession}>
+            <Plus className="w-4 h-4 mr-2" />
+            Sesi Baru
+          </Button>
           <Button variant="outline" onClick={clearChatHistory}>
             <Trash2 className="w-4 h-4 mr-2" />
             Hapus Chat
