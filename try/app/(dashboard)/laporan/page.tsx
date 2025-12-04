@@ -32,6 +32,7 @@ import {
 export default function LaporanPage() {
   const { sales, products, settings } = useStore();
   const [isEmailSending, setIsEmailSending] = useState(false);
+  const [emailTarget, setEmailTarget] = useState('');
 
   // Calculate data
   const { start, end } = getDateRange(30);
@@ -128,8 +129,11 @@ export default function LaporanPage() {
 
   // Send report via email
   const handleSendEmail = async () => {
-    if (!settings.notificationEmail) {
-      alert('Silakan atur email notifikasi di pengaturan terlebih dahulu');
+    // Prioritas: 1. Email yang diinput manual, 2. Email dari Pengaturan
+    const recipientEmail = emailTarget || settings.notificationEmail;
+    
+    if (!recipientEmail) {
+      alert('❌ Email tujuan belum diatur!\n\nSilakan atur email notifikasi di halaman Pengaturan, atau masukkan email di kolom input.');
       return;
     }
 
@@ -143,7 +147,7 @@ export default function LaporanPage() {
           </h2>
           
           <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>Toko:</strong> ${settings.storeName}</p>
+            <p><strong>Toko:</strong> ${settings.businessName || settings.storeName || 'Toko Saya'}</p>
             <p><strong>Periode:</strong> ${start.toLocaleDateString('id-ID')} - ${end.toLocaleDateString('id-ID')}</p>
           </div>
 
@@ -236,7 +240,7 @@ export default function LaporanPage() {
           </div>
 
           <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #999; font-size: 12px;">
-            <p>Laporan ini dikirim secara otomatis oleh sistem Analistik UMKM</p>
+            <p>Laporan ini dikirim secara otomatis oleh sistem Analistik Penjualan</p>
             <p>Waktu: ${new Date().toLocaleString('id-ID')}</p>
           </div>
         </div>
@@ -249,9 +253,9 @@ export default function LaporanPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          recipientEmail: settings.notificationEmail,
+          recipientEmail,
           reportHTML,
-          reportSubject: `Laporan Penjualan - ${settings.storeName} (${new Date().toLocaleDateString('id-ID')})`,
+          reportSubject: `Laporan Penjualan - ${settings.businessName || settings.storeName || 'Toko Saya'} (${new Date().toLocaleDateString('id-ID')})`,
         }),
       });
 
@@ -265,7 +269,8 @@ export default function LaporanPage() {
         throw new Error(data.error || 'Gagal mengirim email');
       }
 
-      alert(`✅ Email berhasil dikirim ke ${settings.notificationEmail}`);
+      alert(`✅ Email berhasil dikirim ke ${recipientEmail}`);
+      setEmailTarget('');
     } catch (error) {
       console.error('Email error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Kesalahan tidak diketahui';
@@ -281,16 +286,27 @@ export default function LaporanPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">📮 Laporan Otomatis</h1>
-          <p className="text-slate-500 mt-1">Laporan lengkap penjualan dan insight</p>
+          <p className="text-slate-500 mt-1">
+            Kirim ke: <span className="font-medium text-blue-600">{settings.notificationEmail || 'Belum diatur di Pengaturan'}</span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={handleSendEmail} disabled={isEmailSending}>
-            <Mail className="w-4 h-4 mr-2" />
-            {isEmailSending ? 'Mengirim...' : 'Kirim Email'}
-          </Button>
-          <Button onClick={handleExportReport}>
+          <div className="flex items-center gap-2">
+            <input
+              type="email"
+              placeholder={settings.notificationEmail || "Atur di Pengaturan..."}
+              value={emailTarget}
+              onChange={(e) => setEmailTarget(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <Button onClick={handleSendEmail} disabled={isEmailSending}>
+              <Mail className="w-4 h-4 mr-2" />
+              {isEmailSending ? 'Mengirim...' : 'Kirim'}
+            </Button>
+          </div>
+          <Button onClick={handleExportReport} variant="outline">
             <Download className="w-4 h-4 mr-2" />
-            Export Laporan
+            Export
           </Button>
         </div>
       </div>
