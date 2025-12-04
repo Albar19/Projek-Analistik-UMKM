@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SalesAI - Dashboard Penjualan UMKM",
+  title: "Analistik UMKM",
   description: "Dashboard penjualan UMKM dengan analisis AI dan prediksi cerdas",
 };
 

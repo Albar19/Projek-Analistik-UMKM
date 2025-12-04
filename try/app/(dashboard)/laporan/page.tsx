@@ -330,7 +330,7 @@ export default function LaporanPage() {
 
         {/* Footer */}
         <div className="border-t border-slate-200 mt-8 pt-4 text-center text-sm text-slate-500">
-          <p>Laporan dibuat otomatis oleh SalesAI</p>
+          <p>Laporan dibuat otomatis oleh Analistik UMKM</p>
           <p>{new Date().toLocaleString('id-ID')}</p>
         </div>
       </Card>
