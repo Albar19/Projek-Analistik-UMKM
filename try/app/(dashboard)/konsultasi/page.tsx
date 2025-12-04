@@ -307,28 +307,6 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
               </div>
             </div>
           </Card>
-
-          {/* API Status */}
-          <Card className={settings.nvidiaApiKey ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}>
-            <div className="flex items-center gap-2">
-              {settings.nvidiaApiKey ? (
-                <>
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm text-green-700">NVIDIA NIM Terhubung</span>
-                </>
-              ) : (
-                <>
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                  <span className="text-sm text-yellow-700">Mode Offline</span>
-                </>
-              )}
-            </div>
-            {!settings.nvidiaApiKey && (
-              <p className="text-xs text-yellow-600 mt-2">
-                Konfigurasi API key di Pengaturan untuk respons AI yang lebih baik
-              </p>
-            )}
-          </Card>
         </div>
       </div>
     </div>
