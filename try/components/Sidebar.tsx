@@ -18,8 +18,9 @@ import {
   LogOut,
   User,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import { useStore } from '@/lib/store';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -36,6 +37,22 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const { data: session, status } = useSession();
+  const loadDataFromMySQL = useStore((state) => state.loadDataFromMySQL);
+
+  // Load user data from MySQL when session is established
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      const user = {
+        id: session.user.id || 'unknown',
+        name: session.user.name || 'User',
+        email: session.user.email || '',
+        image: session.user.image || undefined,
+        role: 'admin' as const,
+        createdAt: new Date(),
+      };
+      loadDataFromMySQL(user.id, user);
+    }
+  }, [status, session, loadDataFromMySQL]);
 
   // Hide sidebar on login page
   if (pathname === '/login') {

@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
+import { initializeDatabase } from "@/lib/mysql";
+
+// Initialize database on app start
+initializeDatabase().catch(err => console.error("Failed to initialize database:", err));
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

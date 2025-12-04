@@ -1,5 +1,7 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
+import { query } from "@/lib/mysql";
+import { v4 as uuidv4 } from "uuid";
 
 // Log untuk debugging
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -23,7 +25,38 @@ const config = {
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "google") {
-        console.log("Google login success:", user.email);
+        try {
+          // Check if user exists in database
+          const userResult = await query(
+            'SELECT id FROM users WHERE email = ?',
+            [user.email!]
+          );
+
+          if (!Array.isArray(userResult) || userResult.length === 0) {
+            // Create new user
+            try {
+              const userId = uuidv4();
+              await query(
+                'INSERT INTO users (id, email, name, image) VALUES (?, ?, ?, ?)',
+                [userId, user.email, user.name, user.image]
+              );
+
+              // Create default business settings
+              const settingsId = uuidv4();
+              await query(
+                'INSERT INTO business_settings (id, userId, storeName, timezone, currency) VALUES (?, ?, ?, ?, ?)',
+                [settingsId, userId, 'Toko Saya', 'Asia/Jakarta', 'IDR']
+              );
+
+              console.log("✅ New user created:", user.email);
+            } catch (error) {
+              console.error("⚠️ Failed to create user in database:", (error as Error).message);
+              // Don't block login if database fails
+            }
+          }
+        } catch (error) {
+          console.error("Error during sign in:", error);
+        }
       }
       return true;
     },

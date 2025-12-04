@@ -37,6 +37,7 @@ interface AppState {
   
   // Actions - User & Data Management
   initializeUserData: (userId: string, userName: string, userEmail: string, userImage?: string) => void;
+  loadDataFromMySQL: (userId: string, user: User) => Promise<void>;
   clearUserData: () => void;
   
   // Actions - Products
@@ -173,6 +174,49 @@ export const useStore = create<AppState>()((set, get) => ({
     }
   },
   
+  // Load data from MySQL - called after login to restore persisted data
+  loadDataFromMySQL: async (userId, user) => {
+    try {
+      const response = await fetch('/api/data/load');
+      const data = await response.json();
+      
+      // Set data regardless of response.ok status
+      set({
+        currentUserId: userId,
+        currentUser: user,
+        products: data.products || [],
+        sales: data.sales || [],
+        settings: data.settings || getEmptyState().settings,
+      });
+      
+      if (!response.ok) {
+        console.warn('⚠️ Data load returned non-ok status but using provided data');
+      }
+    } catch (error) {
+      console.error('Error loading data from MySQL:', error);
+      // Fallback to localStorage if MySQL load fails
+      const existingData = loadUserData(userId);
+      if (existingData) {
+        set({
+          currentUserId: userId,
+          currentUser: user,
+          products: existingData.products || [],
+          sales: existingData.sales || [],
+          settings: existingData.settings || getEmptyState().settings,
+          chatHistory: existingData.chatHistory || [],
+          activityLogs: existingData.activityLogs || [],
+        });
+      } else {
+        // No localStorage data either, use defaults
+        set({
+          currentUserId: userId,
+          currentUser: user,
+          ...getEmptyState(),
+        });
+      }
+    }
+  },
+  
   // Clear user data on logout
   clearUserData: () => {
     set({
@@ -188,6 +232,12 @@ export const useStore = create<AppState>()((set, get) => ({
       const newProducts = [...state.products, product];
       if (state.currentUserId) {
         saveUserData(state.currentUserId, { ...state, products: newProducts });
+        // Also save to MySQL
+        fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(product),
+        }).catch((error) => console.error('Failed to save product to MySQL:', error));
       }
       return { products: newProducts };
     });
@@ -240,6 +290,12 @@ export const useStore = create<AppState>()((set, get) => ({
       const newSales = [...state.sales, sale];
       if (state.currentUserId) {
         saveUserData(state.currentUserId, { ...state, sales: newSales });
+        // Also save to MySQL
+        fetch('/api/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sale),
+        }).catch((error) => console.error('Failed to save sale to MySQL:', error));
       }
       return { sales: newSales };
     });
@@ -257,6 +313,12 @@ export const useStore = create<AppState>()((set, get) => ({
       const updatedSales = [...state.sales, ...newSales];
       if (state.currentUserId) {
         saveUserData(state.currentUserId, { ...state, sales: updatedSales });
+        // Also save to MySQL
+        fetch('/api/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sales: newSales }),
+        }).catch((error) => console.error('Failed to save sales to MySQL:', error));
       }
       return { sales: updatedSales };
     });
