@@ -1,18 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+// Database connection menggunakan TiDB Cloud (MySQL-compatible)
+// Lihat lib/mysql.ts untuk implementasi koneksi database
 
-let prisma: PrismaClient;
-
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient();
-} else {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
-  }
-  prisma = global.prisma;
-}
-
-declare global {
-  var prisma: PrismaClient | undefined;
-}
-
-export default prisma;
+export { getPool, query, initializeDatabase, isConnected } from './mysql';

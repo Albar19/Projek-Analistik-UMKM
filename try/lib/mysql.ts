@@ -1,17 +1,22 @@
 import mysql from 'mysql2/promise';
 
 let pool: mysql.Pool | null = null;
-let isConnected = false;
+let _isConnected = false;
+
+// Export getter untuk status koneksi
+export function isConnected(): boolean {
+  return _isConnected;
+}
 
 export async function getPool(): Promise<mysql.Pool> {
   if (pool) return pool;
 
   try {
-    // For Aiven MySQL, disable SSL cert verification in development
+    // For TiDB Cloud, disable SSL cert verification in development
     // In production, implement proper SSL certificate handling
     pool = mysql.createPool({
       host: process.env.MYSQL_HOST,
-      port: parseInt(process.env.MYSQL_PORT || '21462'),
+      port: parseInt(process.env.MYSQL_PORT || '4000'),
       user: process.env.MYSQL_USER,
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DATABASE,
@@ -28,12 +33,12 @@ export async function getPool(): Promise<mysql.Pool> {
     // Test connection
     const conn = await pool.getConnection();
     conn.release();
-    isConnected = true;
+    _isConnected = true;
     console.log('✅ MySQL connection successful');
     return pool;
   } catch (error) {
     console.error('⚠️ MySQL connection failed:', (error as Error).message);
-    isConnected = false;
+    _isConnected = false;
     // Don't throw - allow app to run without MySQL for development
     throw error;
   }

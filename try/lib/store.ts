@@ -180,17 +180,55 @@ export const useStore = create<AppState>()((set, get) => ({
       const response = await fetch('/api/data/load');
       const data = await response.json();
       
-      // Set data regardless of response.ok status
-      set({
-        currentUserId: userId,
-        currentUser: user,
-        products: data.products || [],
-        sales: data.sales || [],
-        settings: data.settings || getEmptyState().settings,
-      });
+      // Check if we got actual data from MySQL (not just empty defaults)
+      const hasRealData = (data.products && data.products.length > 0) || 
+                          (data.sales && data.sales.length > 0);
       
-      if (!response.ok) {
-        console.warn('⚠️ Data load returned non-ok status but using provided data');
+      if (hasRealData) {
+        // Set data from MySQL
+        set({
+          currentUserId: userId,
+          currentUser: user,
+          products: data.products || [],
+          sales: data.sales || [],
+          settings: data.settings || getEmptyState().settings,
+        });
+        
+        // Also save to localStorage as backup
+        saveUserData(userId, {
+          products: data.products || [],
+          sales: data.sales || [],
+          settings: data.settings || getEmptyState().settings,
+          chatHistory: [],
+          activityLogs: [],
+        } as any);
+        
+        console.log('✅ Data loaded from MySQL');
+      } else {
+        // MySQL returned empty data, try localStorage
+        const existingData = loadUserData(userId);
+        if (existingData && ((existingData.products?.length > 0) || (existingData.sales?.length > 0))) {
+          set({
+            currentUserId: userId,
+            currentUser: user,
+            products: existingData.products || [],
+            sales: existingData.sales || [],
+            settings: existingData.settings || getEmptyState().settings,
+            chatHistory: existingData.chatHistory || [],
+            activityLogs: existingData.activityLogs || [],
+          });
+          console.log('✅ Data loaded from localStorage (MySQL empty)');
+        } else {
+          // No data anywhere, use defaults
+          set({
+            currentUserId: userId,
+            currentUser: user,
+            products: data.products || [],
+            sales: data.sales || [],
+            settings: data.settings || getEmptyState().settings,
+          });
+          console.log('ℹ️ No existing data, using defaults');
+        }
       }
     } catch (error) {
       console.error('Error loading data from MySQL:', error);
@@ -206,6 +244,7 @@ export const useStore = create<AppState>()((set, get) => ({
           chatHistory: existingData.chatHistory || [],
           activityLogs: existingData.activityLogs || [],
         });
+        console.log('✅ Data loaded from localStorage (MySQL failed)');
       } else {
         // No localStorage data either, use defaults
         set({
@@ -213,6 +252,7 @@ export const useStore = create<AppState>()((set, get) => ({
           currentUser: user,
           ...getEmptyState(),
         });
+        console.log('ℹ️ No existing data, using defaults');
       }
     }
   },

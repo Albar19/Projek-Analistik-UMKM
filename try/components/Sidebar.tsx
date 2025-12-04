@@ -37,22 +37,23 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const { data: session, status } = useSession();
-  const loadDataFromMySQL = useStore((state) => state.loadDataFromMySQL);
+  const initializeUserData = useStore((state) => state.initializeUserData);
+  const currentUserId = useStore((state) => state.currentUserId);
 
-  // Load user data from MySQL when session is established
+  // Load user data from localStorage when session is established
   useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
-      const user = {
-        id: session.user.id || 'unknown',
-        name: session.user.name || 'User',
-        email: session.user.email || '',
-        image: session.user.image || undefined,
-        role: 'admin' as const,
-        createdAt: new Date(),
-      };
-      loadDataFromMySQL(user.id, user);
+    if (status === 'authenticated' && session?.user?.email && !currentUserId) {
+      // Gunakan EMAIL sebagai userId karena lebih konsisten dari Google OAuth
+      const uniqueUserId = session.user.email; // Email unik dan selalu sama
+      initializeUserData(
+        uniqueUserId,
+        session.user.name || 'User',
+        session.user.email,
+        session.user.image || undefined
+      );
+      console.log('✅ User data initialized for:', uniqueUserId);
     }
-  }, [status, session, loadDataFromMySQL]);
+  }, [status, session, initializeUserData, currentUserId]);
 
   // Hide sidebar on login page
   if (pathname === '/login') {
