@@ -193,14 +193,19 @@ export function calculateProductSales(sales: Sale[], days: number = 30): Product
 
 // Default business settings
 export const defaultSettings: BusinessSettings = {
+  businessName: 'Toko UMKM Sejahtera',
+  businessType: 'retail',
   storeName: 'Toko UMKM Sejahtera',
   storeAddress: 'Jl. Contoh No. 123, Jakarta',
   timezone: 'Asia/Jakarta',
   currency: 'IDR',
   categories: ['Makanan Ringan', 'Minuman', 'Bumbu', 'Sembako'],
   units: ['pcs', 'box', 'botol', 'kg', 'gram', 'liter'],
+  lowStockThreshold: 20,
   minStockAlert: 20,
-  nvidiaApiKey: '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',
+  enableNotifications: true,
+  enableAutoReports: false,
+  reportFrequency: 'weekly',
   emailNotifications: false,
   notificationEmail: '',
 };

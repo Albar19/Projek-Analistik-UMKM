@@ -16,8 +16,6 @@ import {
   Sparkles,
   User,
   RefreshCw,
-  Settings,
-  AlertCircle,
   History,
   Plus,
 } from 'lucide-react';
@@ -101,18 +99,16 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
     setInput('');
     setIsLoading(true);
 
-    // Check if NVIDIA API key is set
-    if (settings.nvidiaApiKey) {
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: userInput, // Gunakan userInput, bukan input
-            context: businessContext,
-            apiKey: settings.nvidiaApiKey,
-          }),
-        });
+    // Selalu gunakan API server (API key di env)
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userInput,
+          context: businessContext,
+        }),
+      });
 
         const data = await response.json();
 
@@ -135,7 +131,7 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
         const errorMessage: ChatMessage = {
           id: `msg-${Date.now()}-error`,
           role: 'assistant',
-          content: `Maaf, terjadi kesalahan: ${error instanceof Error ? error.message : 'Koneksi gagal'}. Silakan coba lagi atau periksa API key di Pengaturan.`,
+          content: `Maaf, terjadi kesalahan: ${error instanceof Error ? error.message : 'Koneksi gagal'}. Silakan coba lagi.`,
           timestamp: new Date(),
         };
         addChatMessage(errorMessage);
@@ -145,30 +141,6 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
       } finally {
         setIsLoading(false);
       }
-    } else {
-      // Fallback local responses
-      setTimeout(() => {
-        const responses = generateLocalResponse(userInput, {
-          totalRevenue,
-          topProducts,
-          lowStockProducts,
-          products,
-          dailySales,
-        });
-
-        const aiMessage: ChatMessage = {
-          id: `msg-${Date.now()}-ai`,
-          role: 'assistant',
-          content: responses,
-          timestamp: new Date(),
-        };
-        addChatMessage(aiMessage);
-        if (currentChatSessionId) {
-          addMessageToSession(currentChatSessionId, aiMessage);
-        }
-        setIsLoading(false);
-      }, 1500);
-    }
   };
 
   // Quick prompts
@@ -196,12 +168,6 @@ Data Bisnis "${settings.businessName || 'Toko Saya'}":
           <p className="text-slate-500 mt-1">Tanya strategi bisnis ke asisten AI</p>
         </div>
         <div className="flex items-center gap-3">
-          {!settings.nvidiaApiKey && (
-            <Badge variant="warning" className="flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              API belum dikonfigurasi
-            </Badge>
-          )}
           <Button variant="outline" onClick={() => window.location.href = '/riwayat'}>
             <History className="w-4 h-4 mr-2" />
             Riwayat

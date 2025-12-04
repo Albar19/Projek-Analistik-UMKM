@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, context, apiKey } = await request.json();
+    const { message, context } = await request.json();
 
-    // Use provided API key or fall back to environment variable
-    const nvidiaApiKey = apiKey || process.env.NVIDIA_API_KEY;
+    // Hanya gunakan environment variable - lebih aman
+    const nvidiaApiKey = process.env.NVIDIA_API_KEY;
 
     if (!nvidiaApiKey) {
       return NextResponse.json(
-        { error: 'API key tidak dikonfigurasi. Silakan tambahkan di Pengaturan.' },
-        { status: 400 }
+        { error: 'API key tidak dikonfigurasi di server.' },
+        { status: 500 }
       );
     }
 
@@ -54,7 +54,7 @@ Berikan jawaban dalam Bahasa Indonesia yang mudah dipahami. Fokus pada:
       
       if (response.status === 401) {
         return NextResponse.json(
-          { error: 'API key tidak valid. Silakan periksa kembali di Pengaturan.' },
+          { error: 'API key tidak valid.' },
           { status: 401 }
         );
       }

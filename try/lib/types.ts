@@ -103,7 +103,6 @@ export interface BusinessSettings {
   units?: string[];
   lowStockThreshold: number;
   minStockAlert?: number;
-  nvidiaApiKey: string;
   enableNotifications: boolean;
   enableAutoReports: boolean;
   reportFrequency: 'daily' | 'weekly' | 'monthly';

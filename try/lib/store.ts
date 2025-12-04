@@ -1,9 +1,6 @@
 import { create } from 'zustand';
 import { Product, Sale, BusinessSettings, ChatMessage, ChatSession, ActivityLog, User } from './types';
 
-// Default NVIDIA API Key
-const NVIDIA_API_KEY = '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';
-
 // Default empty state for new users
 const getEmptyState = () => ({
   products: [] as Product[],
@@ -17,7 +14,6 @@ const getEmptyState = () => ({
     enableNotifications: true,
     enableAutoReports: false,
     reportFrequency: 'weekly' as const,
-    nvidiaApiKey: NVIDIA_API_KEY,
   } as BusinessSettings,
   chatHistory: [] as ChatMessage[],
   chatSessions: [] as ChatSession[],
