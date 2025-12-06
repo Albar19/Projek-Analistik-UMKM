@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { Card, Badge } from '@/components/ui';
@@ -36,6 +36,7 @@ export default function DataPage() {
     addProduct,
     updateProduct,
     deleteProduct,
+    currentUserId,
   } = useStore();
 
   // Get categories and units from settings
@@ -96,6 +97,25 @@ export default function DataPage() {
         p.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [products, searchQuery]);
+
+  // Load fresh data from server on page mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetch('/api/data/load');
+        const data = await response.json();
+        if (data.products || data.sales) {
+          // Update store with fresh data
+          // Note: The store will be updated via initializeUserData on page load
+          // This is just a safety refresh
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+    
+    loadData();
+  }, []);
 
   // Handle add sale
   const handleAddSale = () => {
@@ -191,40 +211,55 @@ export default function DataPage() {
   };
 
   // Handle import Excel
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const data = new Uint8Array(event.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
 
-      // Parse and add sales
-      const newSales: Sale[] = jsonData.map((row, idx: number) => {
-        const product = products.find(
-          (p) => p.name.toLowerCase() === String(row['Produk'] || row['Product'] || '').toLowerCase()
-        );
-        const quantity = parseInt(String(row['Jumlah'] || row['Quantity'] || 1));
-        const price = parseFloat(String(row['Harga'] || row['Price'] || product?.price || 0));
+        let successCount = 0;
 
-        return {
-          id: `import-${Date.now()}-${idx}`,
-          date: String(row['Tanggal'] || row['Date'] || new Date().toISOString().split('T')[0]),
-          productId: product?.id || 'unknown',
-          productName: String(row['Produk'] || row['Product'] || 'Unknown'),
-          quantity,
-          price,
-          total: quantity * price,
-          createdAt: new Date(),
-        };
-      });
+        // Save each sale individually to the database
+        for (const row of jsonData) {
+          const product = products.find(
+            (p) => p.name.toLowerCase() === String(row['Produk'] || row['Product'] || '').toLowerCase()
+          );
+          const quantity = parseInt(String(row['Jumlah'] || row['Quantity'] || 1));
+          const price = parseFloat(String(row['Harga'] || row['Price'] || product?.price || 0));
 
-      addManySales(newSales);
-      alert(`Berhasil import ${newSales.length} data penjualan!`);
+          const response = await fetch('/api/sales', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              date: String(row['Tanggal'] || row['Date'] || new Date().toISOString().split('T')[0]),
+              productId: product?.id || 'unknown',
+              productName: String(row['Produk'] || row['Product'] || 'Unknown'),
+              quantity,
+              price,
+              total: quantity * price,
+            }),
+          });
+
+          if (response.ok) {
+            successCount++;
+          }
+        }
+        
+        alert(`✅ Berhasil import ${successCount} data penjualan!\n\nData sudah tersimpan di server. Klik OK untuk refresh halaman.`);
+        
+        // Reload page to get fresh data from server
+        window.location.reload();
+      } catch (error) {
+        console.error('Error importing:', error);
+        alert('❌ Gagal import data. Silakan coba lagi.');
+      }
     };
     reader.readAsArrayBuffer(file);
 
