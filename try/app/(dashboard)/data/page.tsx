@@ -46,7 +46,8 @@ export default function DataPage() {
   const [activeTab, setActiveTab] = useState<'sales' | 'products' | 'logs'>('sales');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<Sale | Product | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
@@ -58,6 +59,16 @@ export default function DataPage() {
   });
 
   const [productForm, setProductForm] = useState({
+    name: '',
+    category: '',
+    price: '',
+    costPrice: '',
+    stock: '',
+    minStock: '',
+    unit: '',
+  });
+
+  const [editProductForm, setEditProductForm] = useState({
     name: '',
     category: '',
     price: '',
@@ -143,6 +154,40 @@ export default function DataPage() {
       unit: '',
     });
     setShowAddModal(false);
+  };
+
+  // Handle open edit modal
+  const handleOpenEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setEditProductForm({
+      name: product.name,
+      category: product.category,
+      price: product.price.toString(),
+      costPrice: product.costPrice?.toString() || '0',
+      stock: product.stock.toString(),
+      minStock: product.minStock.toString(),
+      unit: product.unit,
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle update product
+  const handleUpdateProduct = () => {
+    if (!editingProduct || !editProductForm.name || !editProductForm.price) return;
+
+    updateProduct(editingProduct.id, {
+      name: editProductForm.name,
+      category: editProductForm.category || categories[0] || 'Lainnya',
+      price: parseFloat(editProductForm.price),
+      costPrice: parseFloat(editProductForm.costPrice) || 0,
+      stock: parseInt(editProductForm.stock) || 0,
+      minStock: parseInt(editProductForm.minStock) || defaultMinStock,
+      unit: editProductForm.unit || units[0] || 'Pcs',
+      updatedAt: new Date(),
+    });
+
+    setShowEditModal(false);
+    setEditingProduct(null);
   };
 
   // Handle import Excel
@@ -389,8 +434,16 @@ export default function DataPage() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handleOpenEditModal(product)}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          title="Edit produk"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => deleteProduct(product.id)}
                           className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          title="Hapus produk"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -555,6 +608,82 @@ export default function DataPage() {
                 </div>
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {showEditModal && editingProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md m-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Produk</h3>
+              <button onClick={() => { setShowEditModal(false); setEditingProduct(null); }}>
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <Input
+                label="Nama Produk"
+                value={editProductForm.name}
+                onChange={(e) => setEditProductForm({ ...editProductForm, name: e.target.value })}
+              />
+              <Select
+                label="Kategori"
+                options={[
+                  { value: '', label: 'Pilih kategori...' },
+                  ...categories.map((cat) => ({ value: cat, label: cat })),
+                ]}
+                value={editProductForm.category}
+                onChange={(e) => setEditProductForm({ ...editProductForm, category: e.target.value })}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Harga Jual"
+                  type="number"
+                  value={editProductForm.price}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, price: e.target.value })}
+                />
+                <Input
+                  label="Harga Modal"
+                  type="number"
+                  value={editProductForm.costPrice}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, costPrice: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Stok"
+                  type="number"
+                  value={editProductForm.stock}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, stock: e.target.value })}
+                />
+                <Input
+                  label="Min. Stok"
+                  type="number"
+                  value={editProductForm.minStock}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, minStock: e.target.value })}
+                />
+              </div>
+              <Select
+                label="Satuan"
+                options={[
+                  { value: '', label: 'Pilih satuan...' },
+                  ...units.map((unit) => ({ value: unit, label: unit })),
+                ]}
+                value={editProductForm.unit}
+                onChange={(e) => setEditProductForm({ ...editProductForm, unit: e.target.value })}
+              />
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => { setShowEditModal(false); setEditingProduct(null); }} className="flex-1">
+                  Batal
+                </Button>
+                <Button onClick={handleUpdateProduct} className="flex-1">
+                  Simpan Perubahan
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
       )}

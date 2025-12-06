@@ -19,7 +19,7 @@ import {
   User,
   History,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useStore } from '@/lib/store';
 
@@ -40,27 +40,64 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: session, status } = useSession();
   const initializeUserData = useStore((state) => state.initializeUserData);
+  const currentUser = useStore((state) => state.currentUser);
   const currentUserId = useStore((state) => state.currentUserId);
+  
+  // Cache user data to prevent flickering
+  const [cachedUser, setCachedUser] = useState<{
+    name: string;
+    email: string;
+    image?: string;
+  } | null>(null);
+  
+  const hasInitialized = useRef(false);
 
-  // Load user data from localStorage when session is established
+  // Update cached user when session or store changes
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.email && !currentUserId) {
-      // Gunakan EMAIL sebagai userId karena lebih konsisten dari Google OAuth
-      const uniqueUserId = session.user.email; // Email unik dan selalu sama
+    if (session?.user) {
+      setCachedUser({
+        name: session.user.name || 'User',
+        email: session.user.email || '',
+        image: session.user.image || undefined,
+      });
+    } else if (currentUser) {
+      setCachedUser({
+        name: currentUser.name || 'User',
+        email: currentUser.email || '',
+        image: currentUser.image || undefined,
+      });
+    }
+  }, [session, currentUser]);
+
+  // Initialize user data when session is established
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.email && !hasInitialized.current) {
+      hasInitialized.current = true;
+      const uniqueUserId = session.user.email;
       initializeUserData(
         uniqueUserId,
         session.user.name || 'User',
         session.user.email,
         session.user.image || undefined
       );
-      console.log('✅ User data initialized for:', uniqueUserId);
     }
-  }, [status, session, initializeUserData, currentUserId]);
+    
+    // Reset on logout
+    if (status === 'unauthenticated') {
+      hasInitialized.current = false;
+      setCachedUser(null);
+    }
+  }, [status, session, initializeUserData]);
 
   // Hide sidebar on login page
   if (pathname === '/login') {
     return null;
   }
+
+  // Use cached user for stable display - only show loading on first load
+  const displayUser = cachedUser || session?.user || currentUser;
+  const isAuthenticated = cachedUser !== null || status === 'authenticated' || currentUserId;
+  const isFirstLoad = status === 'loading' && !cachedUser && !currentUser;
 
   return (
     <>
@@ -83,19 +120,19 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out',
+          'fixed lg:static inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out lg:min-h-screen',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center gap-2 px-6 py-5 border-b border-slate-700">
+        <div className="flex flex-col h-full min-h-screen lg:min-h-full">
+          {/* Logo - Fixed height */}
+          <div className="flex-shrink-0 flex items-center gap-2 px-6 py-5 border-b border-slate-700">
             <BarChart3 className="w-8 h-8 text-blue-400" />
             <span className="text-xl font-bold">Analistik Penjualan</span>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+          {/* Navigation - Takes remaining space, scrollable if needed */}
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto min-h-0">
             {navigation.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -117,9 +154,9 @@ export function Sidebar() {
             })}
           </nav>
 
-          {/* User info & Logout */}
-          <div className="px-4 py-4 border-t border-slate-700">
-            {status === 'loading' ? (
+          {/* User info & Logout - Fixed at bottom, never moves */}
+          <div className="flex-shrink-0 px-4 py-4 border-t border-slate-700 mt-auto">
+            {isFirstLoad ? (
               <div className="flex items-center gap-3 px-4 py-2">
                 <div className="w-10 h-10 rounded-full bg-slate-700 animate-pulse" />
                 <div className="flex-1">
@@ -127,25 +164,25 @@ export function Sidebar() {
                   <div className="h-3 bg-slate-700 rounded animate-pulse w-24" />
                 </div>
               </div>
-            ) : session?.user ? (
+            ) : isAuthenticated && displayUser ? (
               <>
                 <div className="flex items-center gap-3 px-4 py-2">
-                  {session.user.image ? (
+                  {displayUser.image ? (
                     <img 
-                      src={session.user.image} 
-                      alt={session.user.name || 'User'} 
-                      className="w-10 h-10 rounded-full"
+                      src={displayUser.image} 
+                      alt={displayUser.name || 'User'} 
+                      className="w-10 h-10 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
                       <span className="text-sm font-medium">
-                        {session.user.name?.charAt(0) || 'U'}
+                        {displayUser.name?.charAt(0) || 'U'}
                       </span>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{session.user.name}</p>
-                    <p className="text-xs text-slate-400 truncate">{session.user.email}</p>
+                    <p className="text-sm font-medium truncate">{displayUser.name}</p>
+                    <p className="text-xs text-slate-400 truncate">{displayUser.email}</p>
                   </div>
                 </div>
                 <button

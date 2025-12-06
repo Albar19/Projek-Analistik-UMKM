@@ -135,7 +135,7 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
-    // Create business_settings table
+    // Create business_settings table (legacy - keep for compatibility)
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS business_settings (
         id VARCHAR(36) PRIMARY KEY,
@@ -148,6 +148,30 @@ export async function initializeDatabase() {
         currency VARCHAR(10) DEFAULT 'IDR',
         emailNotifications BOOLEAN DEFAULT true,
         notificationEmail VARCHAR(255),
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_userId (userId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Create settings table (main settings table)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id VARCHAR(36) PRIMARY KEY,
+        userId VARCHAR(36) UNIQUE NOT NULL,
+        businessName VARCHAR(255),
+        storeAddress VARCHAR(500),
+        businessType VARCHAR(100) DEFAULT 'retail',
+        timezone VARCHAR(50) DEFAULT 'Asia/Jakarta',
+        currency VARCHAR(10) DEFAULT 'IDR',
+        lowStockThreshold INT DEFAULT 10,
+        enableNotifications BOOLEAN DEFAULT true,
+        enableAutoReports BOOLEAN DEFAULT false,
+        reportFrequency VARCHAR(20) DEFAULT 'weekly',
+        notificationEmail VARCHAR(255),
+        categories TEXT,
+        units TEXT,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,

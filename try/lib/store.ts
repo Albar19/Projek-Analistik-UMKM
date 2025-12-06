@@ -7,13 +7,20 @@ const getEmptyState = () => ({
   sales: [] as Sale[],
   settings: {
     businessName: '',
+    storeName: '',
+    storeAddress: '',
     businessType: 'retail' as const,
     currency: 'IDR',
     timezone: 'Asia/Jakarta',
     lowStockThreshold: 10,
+    minStockAlert: 10,
     enableNotifications: true,
+    emailNotifications: true,
     enableAutoReports: false,
     reportFrequency: 'weekly' as const,
+    notificationEmail: '',
+    categories: ['Makanan', 'Minuman', 'Snack', 'Lainnya'],
+    units: ['Pcs', 'Box', 'Kg', 'Liter'],
   } as BusinessSettings,
   chatHistory: [] as ChatMessage[],
   chatSessions: [] as ChatSession[],
@@ -33,6 +40,7 @@ interface AppState {
   currentChatSessionId: string | null;
   activityLogs: ActivityLog[];
   currentUser: User | null;
+  isLoading: boolean;
   
   // Actions - User & Data Management
   initializeUserData: (userId: string, userName: string, userEmail: string, userImage?: string) => void;
@@ -72,56 +80,22 @@ interface AppState {
   setCurrentUser: (user: User | null) => void;
 }
 
-// Helper function to get user-specific storage key
-const getUserStorageKey = (userId: string) => `sales-dashboard-${userId}`;
-
-// Helper function to load user data from localStorage
-const loadUserData = (userId: string) => {
-  if (typeof window === 'undefined') return null;
-  
-  const storageKey = getUserStorageKey(userId);
-  const data = localStorage.getItem(storageKey);
-  
-  if (data) {
-    try {
-      const parsed = JSON.parse(data);
-      return parsed.state || null;
-    } catch {
-      return null;
+// Helper function to save data to MySQL cloud database
+const saveToCloud = async (endpoint: string, data: unknown, method: string = 'POST') => {
+  try {
+    const response = await fetch(endpoint, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      console.error(`Failed to save to cloud: ${endpoint}`, await response.text());
     }
+    return response.ok;
+  } catch (error) {
+    console.error(`Error saving to cloud: ${endpoint}`, error);
+    return false;
   }
-  return null;
-};
-
-// Helper function to save user data to localStorage
-const saveUserData = (userId: string, data: Partial<AppState>) => {
-  if (typeof window === 'undefined') return;
-  
-  const storageKey = getUserStorageKey(userId);
-  const existingData = localStorage.getItem(storageKey);
-  let currentState = {};
-  
-  if (existingData) {
-    try {
-      const parsed = JSON.parse(existingData);
-      currentState = parsed.state || {};
-    } catch {
-      currentState = {};
-    }
-  }
-  
-  localStorage.setItem(storageKey, JSON.stringify({
-    state: {
-      ...currentState,
-      products: data.products,
-      sales: data.sales,
-      settings: data.settings,
-      chatHistory: data.chatHistory,
-      chatSessions: data.chatSessions,
-      activityLogs: data.activityLogs,
-    },
-    version: 1,
-  }));
 };
 
 export const useStore = create<AppState>()((set, get) => ({
@@ -135,11 +109,10 @@ export const useStore = create<AppState>()((set, get) => ({
   currentChatSessionId: null,
   activityLogs: [],
   currentUser: null,
+  isLoading: false,
   
   // Initialize user data - called when user logs in
   initializeUserData: (userId, userName, userEmail, userImage) => {
-    const existingData = loadUserData(userId);
-    
     const user: User = {
       id: userId,
       name: userName,
@@ -149,129 +122,74 @@ export const useStore = create<AppState>()((set, get) => ({
       createdAt: new Date(),
     };
     
-    if (existingData) {
-      // Load existing user data
-      set({
-        currentUserId: userId,
-        currentUser: user,
-        products: existingData.products || [],
-        sales: existingData.sales || [],
-        settings: existingData.settings || getEmptyState().settings,
-        chatHistory: existingData.chatHistory || [],
-        chatSessions: existingData.chatSessions || [],
-        activityLogs: existingData.activityLogs || [],
-      });
-    } else {
-      // New user - start with empty data
-      const emptyState = getEmptyState();
-      set({
-        currentUserId: userId,
-        currentUser: user,
-        ...emptyState,
-        settings: {
-          ...emptyState.settings,
-          businessName: `Bisnis ${userName}`,
-        },
-      });
-      
-      // Save initial empty state
-      saveUserData(userId, {
-        ...emptyState,
-        settings: {
-          ...emptyState.settings,
-          businessName: `Bisnis ${userName}`,
-        },
-      });
-    }
+    // Set user first, then load data from cloud
+    set({
+      currentUserId: userId,
+      currentUser: user,
+      isLoading: true,
+    });
+    
+    // Load data from MySQL cloud
+    get().loadDataFromMySQL(userId, user);
   },
   
-  // Load data from MySQL - called after login to restore persisted data
+  // Load data from MySQL - data persisten di cloud
   loadDataFromMySQL: async (userId, user) => {
+    set({ isLoading: true });
+    
     try {
       const response = await fetch('/api/data/load');
       const data = await response.json();
       
-      // Check if we got actual data from MySQL (not just empty defaults)
-      const hasRealData = (data.products && data.products.length > 0) || 
-                          (data.sales && data.sales.length > 0);
+      console.log('📡 Loading data from TiDB Cloud...');
+      console.log('📥 Settings received:', data.settings);
       
-      if (hasRealData) {
-        // Set data from MySQL
-        set({
-          currentUserId: userId,
-          currentUser: user,
-          products: data.products || [],
-          sales: data.sales || [],
-          settings: data.settings || getEmptyState().settings,
-        });
-        
-        // Also save to localStorage as backup
-        saveUserData(userId, {
-          products: data.products || [],
-          sales: data.sales || [],
-          settings: data.settings || getEmptyState().settings,
-          chatHistory: [],
-          activityLogs: [],
-        } as any);
-        
-        console.log('✅ Data loaded from MySQL');
-      } else {
-        // MySQL returned empty data, try localStorage
-        const existingData = loadUserData(userId);
-        if (existingData && ((existingData.products?.length > 0) || (existingData.sales?.length > 0))) {
-          set({
-            currentUserId: userId,
-            currentUser: user,
-            products: existingData.products || [],
-            sales: existingData.sales || [],
-            settings: existingData.settings || getEmptyState().settings,
-            chatHistory: existingData.chatHistory || [],
-            chatSessions: existingData.chatSessions || [],
-            activityLogs: existingData.activityLogs || [],
-          });
-          console.log('✅ Data loaded from localStorage (MySQL empty)');
-        } else {
-          // No data anywhere, use defaults
-          set({
-            currentUserId: userId,
-            currentUser: user,
-            products: data.products || [],
-            sales: data.sales || [],
-            settings: data.settings || getEmptyState().settings,
-          });
-          console.log('ℹ️ No existing data, using defaults');
-        }
-      }
+      // Ensure storeName is synced with businessName
+      const loadedSettings = data.settings ? {
+        ...getEmptyState().settings,
+        ...data.settings,
+        storeName: data.settings.storeName || data.settings.businessName || `Toko ${user.name}`,
+        businessName: data.settings.businessName || data.settings.storeName || `Toko ${user.name}`,
+      } : {
+        ...getEmptyState().settings,
+        storeName: `Toko ${user.name}`,
+        businessName: `Toko ${user.name}`,
+      };
+      
+      set({
+        currentUserId: userId,
+        currentUser: user,
+        products: data.products || [],
+        sales: data.sales || [],
+        settings: loadedSettings,
+        isLoading: false,
+      });
+      
+      console.log('✅ Data loaded from TiDB Cloud:', {
+        products: data.products?.length || 0,
+        sales: data.sales?.length || 0,
+        storeName: loadedSettings.storeName,
+      });
     } catch (error) {
-      console.error('Error loading data from MySQL:', error);
-      // Fallback to localStorage if MySQL load fails
-      const existingData = loadUserData(userId);
-      if (existingData) {
-        set({
-          currentUserId: userId,
-          currentUser: user,
-          products: existingData.products || [],
-          sales: existingData.sales || [],
-          settings: existingData.settings || getEmptyState().settings,
-          chatHistory: existingData.chatHistory || [],
-          chatSessions: existingData.chatSessions || [],
-          activityLogs: existingData.activityLogs || [],
-        });
-        console.log('✅ Data loaded from localStorage (MySQL failed)');
-      } else {
-        // No localStorage data either, use defaults
-        set({
-          currentUserId: userId,
-          currentUser: user,
-          ...getEmptyState(),
-        });
-        console.log('ℹ️ No existing data, using defaults');
-      }
+      console.error('❌ Error loading data from cloud:', error);
+      // Use empty defaults if cloud fails
+      set({
+        currentUserId: userId,
+        currentUser: user,
+        ...getEmptyState(),
+        settings: {
+          ...getEmptyState().settings,
+          storeName: `Toko ${user.name}`,
+          businessName: `Toko ${user.name}`,
+        },
+        isLoading: false,
+      });
     }
   },
   
-  // Clear user data on logout
+  // Clear user data on logout (only clears local state, cloud data remains)
   clearUserData: () => {
+    console.log('🚪 User logged out - cloud data preserved');
     set({
       currentUserId: null,
       currentUser: null,
@@ -279,21 +197,15 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
   
-  // Products
+  // Products - Save to cloud
   addProduct: (product) => {
-    set((state) => {
-      const newProducts = [...state.products, product];
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, products: newProducts });
-        // Also save to MySQL
-        fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(product),
-        }).catch((error) => console.error('Failed to save product to MySQL:', error));
-      }
-      return { products: newProducts };
+    set((state) => ({ products: [...state.products, product] }));
+    
+    // Save to cloud
+    saveToCloud('/api/products', product).then((success) => {
+      if (success) console.log('✅ Product saved to cloud:', product.name);
     });
+    
     get().addActivityLog({
       userId: get().currentUser?.id || 'system',
       userName: get().currentUser?.name || 'System',
@@ -303,15 +215,17 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   
   updateProduct: (id, updates) => {
-    set((state) => {
-      const newProducts = state.products.map((p) =>
+    set((state) => ({
+      products: state.products.map((p) =>
         p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
-      );
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, products: newProducts });
-      }
-      return { products: newProducts };
+      ),
+    }));
+    
+    // Save to cloud
+    saveToCloud(`/api/products/${id}`, updates, 'PUT').then((success) => {
+      if (success) console.log('✅ Product updated in cloud:', id);
     });
+    
     get().addActivityLog({
       userId: get().currentUser?.id || 'system',
       userName: get().currentUser?.name || 'System',
@@ -322,13 +236,15 @@ export const useStore = create<AppState>()((set, get) => ({
   
   deleteProduct: (id) => {
     const product = get().products.find((p) => p.id === id);
-    set((state) => {
-      const newProducts = state.products.filter((p) => p.id !== id);
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, products: newProducts });
-      }
-      return { products: newProducts };
+    set((state) => ({
+      products: state.products.filter((p) => p.id !== id),
+    }));
+    
+    // Delete from cloud
+    saveToCloud(`/api/products/${id}`, {}, 'DELETE').then((success) => {
+      if (success) console.log('✅ Product deleted from cloud:', id);
     });
+    
     get().addActivityLog({
       userId: get().currentUser?.id || 'system',
       userName: get().currentUser?.name || 'System',
@@ -337,21 +253,15 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
   
-  // Sales
+  // Sales - Save to cloud
   addSale: (sale) => {
-    set((state) => {
-      const newSales = [...state.sales, sale];
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, sales: newSales });
-        // Also save to MySQL
-        fetch('/api/sales', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sale),
-        }).catch((error) => console.error('Failed to save sale to MySQL:', error));
-      }
-      return { sales: newSales };
+    set((state) => ({ sales: [...state.sales, sale] }));
+    
+    // Save to cloud
+    saveToCloud('/api/sales', sale).then((success) => {
+      if (success) console.log('✅ Sale saved to cloud:', sale.id);
     });
+    
     // Update product stock
     const product = get().products.find((p) => p.id === sale.productId);
     if (product) {
@@ -362,19 +272,13 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   
   addManySales: (newSales) => {
-    set((state) => {
-      const updatedSales = [...state.sales, ...newSales];
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, sales: updatedSales });
-        // Also save to MySQL
-        fetch('/api/sales', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sales: newSales }),
-        }).catch((error) => console.error('Failed to save sales to MySQL:', error));
-      }
-      return { sales: updatedSales };
+    set((state) => ({ sales: [...state.sales, ...newSales] }));
+    
+    // Save all to cloud
+    saveToCloud('/api/sales', { sales: newSales }).then((success) => {
+      if (success) console.log('✅ Bulk sales saved to cloud:', newSales.length);
     });
+    
     get().addActivityLog({
       userId: get().currentUser?.id || 'system',
       userName: get().currentUser?.name || 'System',
@@ -384,36 +288,49 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   
   updateSale: (id, updates) => {
-    set((state) => {
-      const newSales = state.sales.map((s) =>
-        s.id === id ? { ...s, ...updates } : s
-      );
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, sales: newSales });
-      }
-      return { sales: newSales };
+    set((state) => ({
+      sales: state.sales.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+    }));
+    
+    // Update in cloud
+    saveToCloud(`/api/sales/${id}`, updates, 'PUT').then((success) => {
+      if (success) console.log('✅ Sale updated in cloud:', id);
     });
   },
   
   deleteSale: (id) => {
-    set((state) => {
-      const newSales = state.sales.filter((s) => s.id !== id);
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, sales: newSales });
-      }
-      return { sales: newSales };
+    set((state) => ({
+      sales: state.sales.filter((s) => s.id !== id),
+    }));
+    
+    // Delete from cloud
+    saveToCloud(`/api/sales/${id}`, {}, 'DELETE').then((success) => {
+      if (success) console.log('✅ Sale deleted from cloud:', id);
     });
   },
   
-  // Settings
+  // Settings - Save to cloud
   updateSettings: (newSettings) => {
-    set((state) => {
-      const updatedSettings = { ...state.settings, ...newSettings };
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, settings: updatedSettings });
-      }
-      return { settings: updatedSettings };
+    // Sync storeName and businessName
+    const syncedSettings = {
+      ...newSettings,
+      businessName: newSettings.storeName || newSettings.businessName || get().settings.businessName,
+      storeName: newSettings.storeName || newSettings.businessName || get().settings.storeName,
+    };
+    
+    set((state) => ({
+      settings: { ...state.settings, ...syncedSettings },
+    }));
+    
+    // Save to cloud
+    const fullSettings = { ...get().settings };
+    console.log('📤 Saving settings to cloud:', fullSettings);
+    
+    saveToCloud('/api/settings', fullSettings, 'PUT').then((success) => {
+      if (success) console.log('✅ Settings saved to cloud:', fullSettings.storeName || fullSettings.businessName);
+      else console.error('❌ Failed to save settings to cloud');
     });
+    
     get().addActivityLog({
       userId: get().currentUser?.id || 'system',
       userName: get().currentUser?.name || 'System',
@@ -422,27 +339,18 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
   
-  // Chat
+  // Chat - stored in memory only (not persisted to cloud for privacy)
   addChatMessage: (message) => {
-    set((state) => {
-      const newChatHistory = [...state.chatHistory, message];
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, chatHistory: newChatHistory });
-      }
-      return { chatHistory: newChatHistory };
-    });
+    set((state) => ({
+      chatHistory: [...state.chatHistory, message],
+    }));
   },
   
   clearChatHistory: () => {
-    set((state) => {
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, chatHistory: [] });
-      }
-      return { chatHistory: [] };
-    });
+    set({ chatHistory: [] });
   },
   
-  // Chat Sessions
+  // Chat Sessions - stored in memory
   createChatSession: (title?: string) => {
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date();
@@ -455,51 +363,39 @@ export const useStore = create<AppState>()((set, get) => ({
       isActive: true,
     };
     
-    set((state) => {
-      const newSessions = [...state.chatSessions, newSession];
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
-      }
-      return { chatSessions: newSessions, currentChatSessionId: sessionId };
-    });
+    set((state) => ({
+      chatSessions: [...state.chatSessions, newSession],
+      currentChatSessionId: sessionId,
+    }));
     
     return sessionId;
   },
   
   addMessageToSession: (sessionId: string, message: ChatMessage) => {
-    set((state) => {
-      const newSessions = state.chatSessions.map((session) =>
+    set((state) => ({
+      chatSessions: state.chatSessions.map((session) =>
         session.id === sessionId
           ? { ...session, messages: [...session.messages, message], updatedAt: new Date() }
           : session
-      );
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
-      }
-      return { chatSessions: newSessions };
-    });
+      ),
+    }));
   },
   
   saveCurrentSession: () => {
     const state = get();
     if (state.currentChatSessionId && state.chatHistory.length > 0) {
-      // Generate title from first user message
       const firstUserMessage = state.chatHistory.find((msg) => msg.role === 'user');
       const title = firstUserMessage
         ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
         : `Chat ${new Date().toLocaleDateString('id-ID')}`;
       
-      set((state) => {
-        const newSessions = state.chatSessions.map((session) =>
+      set((state) => ({
+        chatSessions: state.chatSessions.map((session) =>
           session.id === state.currentChatSessionId
             ? { ...session, messages: state.chatHistory, title, updatedAt: new Date(), isActive: false }
             : session
-        );
-        if (state.currentUserId) {
-          saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
-        }
-        return { chatSessions: newSessions };
-      });
+        ),
+      }));
     }
   },
   
@@ -517,33 +413,25 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   
   deleteChatSession: (sessionId: string) => {
-    set((state) => {
-      const newSessions = state.chatSessions.filter((s) => s.id !== sessionId);
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, chatSessions: newSessions });
-      }
-      return { chatSessions: newSessions };
-    });
+    set((state) => ({
+      chatSessions: state.chatSessions.filter((s) => s.id !== sessionId),
+    }));
   },
   
   setCurrentChatSession: (sessionId: string | null) => {
     set({ currentChatSessionId: sessionId });
   },
   
-  // Activity Log
+  // Activity Log - stored in memory only
   addActivityLog: (log) => {
     const newLog: ActivityLog = {
       ...log,
       id: `log-${Date.now()}`,
       timestamp: new Date(),
     };
-    set((state) => {
-      const newLogs = [newLog, ...state.activityLogs].slice(0, 100);
-      if (state.currentUserId) {
-        saveUserData(state.currentUserId, { ...state, activityLogs: newLogs });
-      }
-      return { activityLogs: newLogs };
-    });
+    set((state) => ({
+      activityLogs: [newLog, ...state.activityLogs].slice(0, 100),
+    }));
   },
   
   // User

@@ -41,18 +41,38 @@ const config = {
                 [userId, user.email, user.name, user.image]
               );
 
-              // Create default business settings
+              // Create default settings in 'settings' table (not business_settings)
               const settingsId = uuidv4();
               await query(
-                'INSERT INTO business_settings (id, userId, storeName, timezone, currency) VALUES (?, ?, ?, ?, ?)',
-                [settingsId, userId, 'Toko Saya', 'Asia/Jakarta', 'IDR']
+                `INSERT INTO settings (
+                  id, userId, businessName, storeAddress, businessType, 
+                  currency, timezone, lowStockThreshold, enableNotifications,
+                  enableAutoReports, reportFrequency, categories, units
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  settingsId, 
+                  userId, 
+                  `Toko ${user.name}`,  // businessName
+                  '',                    // storeAddress
+                  'retail',              // businessType
+                  'IDR',                 // currency
+                  'Asia/Jakarta',        // timezone
+                  10,                    // lowStockThreshold
+                  1,                     // enableNotifications
+                  0,                     // enableAutoReports
+                  'weekly',              // reportFrequency
+                  JSON.stringify(['Makanan', 'Minuman', 'Snack', 'Lainnya']),  // categories
+                  JSON.stringify(['Pcs', 'Box', 'Kg', 'Liter'])                 // units
+                ]
               );
 
-              console.log("✅ New user created:", user.email);
+              console.log("✅ New user created:", user.email, "with userId:", userId);
             } catch (error) {
               console.error("⚠️ Failed to create user in database:", (error as Error).message);
               // Don't block login if database fails
             }
+          } else {
+            console.log("✅ Existing user logged in:", user.email, "userId:", (userResult[0] as any).id);
           }
         } catch (error) {
           console.error("Error during sign in:", error);

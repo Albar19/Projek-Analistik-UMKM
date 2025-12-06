@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { Card, Badge } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
@@ -20,34 +20,58 @@ import {
 } from 'lucide-react';
 
 export default function PengaturanPage() {
-  const { settings, updateSettings } = useStore();
+  const { settings, updateSettings, isLoading } = useStore();
   const [activeTab, setActiveTab] = useState('store');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   // Form states
   const [storeForm, setStoreForm] = useState({
-    storeName: settings.storeName || settings.businessName || '',
-    storeAddress: settings.storeAddress || '',
-    timezone: settings.timezone || 'Asia/Jakarta',
-    currency: settings.currency || 'IDR',
+    storeName: '',
+    storeAddress: '',
+    timezone: 'Asia/Jakarta',
+    currency: 'IDR',
   });
 
   const [categoryForm, setCategoryForm] = useState({
-    categories: settings.categories || ['Makanan', 'Minuman', 'Snack', 'Lainnya'],
-    units: settings.units || ['Pcs', 'Box', 'Kg', 'Liter'],
+    categories: ['Makanan', 'Minuman', 'Snack', 'Lainnya'],
+    units: ['Pcs', 'Box', 'Kg', 'Liter'],
     newCategory: '',
     newUnit: '',
   });
 
   const [stockForm, setStockForm] = useState({
-    minStockAlert: settings.minStockAlert || settings.lowStockThreshold || 10,
+    minStockAlert: 10,
   });
 
   const [notifForm, setNotifForm] = useState({
-    emailNotifications: settings.emailNotifications || settings.enableNotifications || false,
-    notificationEmail: settings.notificationEmail || '',
+    emailNotifications: false,
+    notificationEmail: '',
   });
+
+  // Update form when settings loaded from cloud
+  useEffect(() => {
+    if (!isLoading && settings) {
+      setStoreForm({
+        storeName: settings.storeName || settings.businessName || '',
+        storeAddress: settings.storeAddress || '',
+        timezone: settings.timezone || 'Asia/Jakarta',
+        currency: settings.currency || 'IDR',
+      });
+      setCategoryForm(prev => ({
+        ...prev,
+        categories: settings.categories || ['Makanan', 'Minuman', 'Snack', 'Lainnya'],
+        units: settings.units || ['Pcs', 'Box', 'Kg', 'Liter'],
+      }));
+      setStockForm({
+        minStockAlert: settings.minStockAlert || settings.lowStockThreshold || 10,
+      });
+      setNotifForm({
+        emailNotifications: settings.emailNotifications || settings.enableNotifications || false,
+        notificationEmail: settings.notificationEmail || '',
+      });
+    }
+  }, [isLoading, settings]);
 
   // Save handlers
   const handleSave = () => {
@@ -67,6 +91,16 @@ export default function PengaturanPage() {
       setTimeout(() => setShowSuccess(false), 3000);
     }, 500);
   };
+
+  // Show loading while data is loading from cloud
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <span className="ml-3 text-gray-600">Memuat pengaturan...</span>
+      </div>
+    );
+  }
 
   // Add category/unit
   const addCategory = () => {
