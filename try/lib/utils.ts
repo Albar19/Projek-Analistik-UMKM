@@ -1,12 +1,16 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Sale, DailySales, SalesInsight, SalesPrediction, StockAnalysis, Product, ProductSales } from './types';
+import { Sale, DailySales, SalesInsight, SalesPrediction, StockAnalysis, Product, ProductSales, PredictionRecommendation } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function formatCurrency(value: number): string {
+  // Handle NaN or undefined values
+  if (isNaN(value) || value === undefined || value === null) {
+    return 'Rp 0';
+  }
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -279,4 +283,266 @@ export function parseNaturalQuery(query: string): { type: string; params: Record
   }
   
   return { type: 'general', params: {} };
+}
+
+// Generate AI Recommendations based on prediction
+export function generateRecommendations(
+  prediction: SalesPrediction,
+  products: Product[],
+  productSales: ProductSales[]
+): PredictionRecommendation[] {
+  const recommendations: PredictionRecommendation[] = [];
+
+  // 1. Restock Recommendation - Produk dengan prediksi naik dan stok rendah
+  const upTrendProducts = prediction.productPredictions
+    ?.filter((p) => {
+      const product = products.find((prod) => prod.id === p.productId);
+      return product && product.stock <= product.minStock && p.confidence >= 70;
+    })
+    .slice(0, 3);
+
+  if (upTrendProducts && upTrendProducts.length > 0) {
+    const totalCost = upTrendProducts.reduce((sum, p) => {
+      const product = products.find((prod) => prod.id === p.productId);
+      return sum + (product ? product.costPrice * p.predictedQuantity * 2 : 0);
+    }, 0);
+
+    recommendations.push({
+      id: 'restock-1',
+      type: 'restock',
+      title: '📦 Restock Produk High-Demand',
+      description: `Produk dengan prediksi penjualan naik memiliki stok rendah. Segera restock untuk menghindari kehilangan penjualan.`,
+      priority: 'high',
+      icon: '📦',
+      actionItems: upTrendProducts.map((p) => `Restock ${p.productName}: minimal ${p.predictedQuantity * 2} unit`),
+      expectedImpact: `Peningkatan revenue hingga ${formatCurrency(upTrendProducts.reduce((sum, p) => sum + p.predictedQuantity * 100000, 0))}`,
+      productIds: upTrendProducts.map((p) => p.productId),
+      relatedProducts: upTrendProducts.map((p) => ({
+        productId: p.productId,
+        productName: p.productName,
+        relevance: p.confidence,
+      })),
+    });
+  }
+
+  // 2. Promotion Recommendation - Produk dengan prediksi turun
+  const downTrendProducts = prediction.productPredictions
+    ?.filter((p) => {
+      const productSale = productSales.find((ps) => ps.productId === p.productId);
+      return productSale && productSale.totalRevenue > 0;
+    })
+    .sort((a, b) => a.predictedQuantity - b.predictedQuantity)
+    .slice(0, 2);
+
+  if (downTrendProducts && downTrendProducts.length > 0) {
+    recommendations.push({
+      id: 'promo-1',
+      type: 'promotion',
+      title: '🎯 Promosi untuk Produk Slow-Moving',
+      description: `Beberapa produk menunjukkan penjualan yang melambat. Tawarkan promosi untuk meningkatkan engagement.`,
+      priority: 'high',
+      icon: '🎯',
+      actionItems: [
+        `Bundle ${downTrendProducts[0]?.productName} dengan produk favorit - diskon 10%`,
+        downTrendProducts[1] ? `Promo buy 2 get 1 untuk ${downTrendProducts[1]?.productName}` : 'Siapkan flash sale',
+        'Target promosi ke pelanggan setia',
+      ],
+      expectedImpact: `Peningkatan penjualan hingga 25-30% untuk produk promo`,
+      productIds: downTrendProducts.map((p) => p.productId),
+      relatedProducts: downTrendProducts.map((p) => ({
+        productId: p.productId,
+        productName: p.productName,
+        relevance: 100 - p.confidence,
+      })),
+    });
+  }
+
+  // 3. Bundling Recommendation - Kombinasi produk terbaik
+  const topProducts = prediction.productPredictions
+    ?.sort((a, b) => b.predictedQuantity - a.predictedQuantity)
+    .slice(0, 3);
+
+  if (topProducts && topProducts.length >= 2) {
+    recommendations.push({
+      id: 'bundling-1',
+      type: 'bundling',
+      title: '🎁 Paket Bundle Produk Terbaik',
+      description: `Produk-produk ini cocok dibundel untuk meningkatkan average transaction value.`,
+      priority: 'medium',
+      icon: '🎁',
+      actionItems: [
+        `Buat paket "${topProducts[0]?.productName} + ${topProducts[1]?.productName}" - diskon 12%`,
+        topProducts[2] ? `Paket premium dengan 3 produk terlaris - diskon 15%` : '',
+        'Promosikan bundle di checkout',
+      ].filter(Boolean),
+      expectedImpact: `Peningkatan average order value hingga 20-25%`,
+      productIds: topProducts.map((p) => p.productId),
+      relatedProducts: topProducts.map((p) => ({
+        productId: p.productId,
+        productName: p.productName,
+        relevance: p.confidence,
+      })),
+    });
+  }
+
+  // 4. Price Adjustment Recommendation
+  if (prediction.trend === 'up' && prediction.trendPercentage > 15) {
+    const highMarginProducts = products
+      .filter((p) => p.price > p.costPrice * 1.5)
+      .slice(0, 2);
+
+    if (highMarginProducts.length > 0) {
+      recommendations.push({
+        id: 'pricing-1',
+        type: 'price-adjustment',
+        title: '💰 Optimasi Harga untuk Margin Lebih Baik',
+        description: `Dengan tren penjualan yang naik, ada peluang untuk meningkatkan harga produk tertentu.`,
+        priority: 'medium',
+        icon: '💰',
+        actionItems: [
+          `Naikkan harga ${highMarginProducts[0]?.name} sebesar 5-8% - masih kompetitif`,
+          highMarginProducts[1] ? `Review harga ${highMarginProducts[1]?.name}` : '',
+          'Monitor perubahan permintaan setelah price change',
+        ].filter(Boolean),
+        expectedImpact: `Peningkatan profit margin hingga 3-5% tanpa mengurangi volume`,
+        productIds: highMarginProducts.map((p) => p.id),
+      });
+    }
+  }
+
+  // 5. Expansion Recommendation - Jika tren sangat positif
+  if (prediction.trend === 'up' && prediction.trendPercentage > 20 && prediction.confidenceLevel >= 75) {
+    recommendations.push({
+      id: 'expansion-1',
+      type: 'expansion',
+      title: '🚀 Kesempatan Ekspansi',
+      description: `Data menunjukkan pertumbuhan yang kuat dan stabil. Pertimbangkan ekspansi produk atau market.`,
+      priority: 'low',
+      icon: '🚀',
+      actionItems: [
+        'Tambah varian warna/ukuran untuk produk bestseller',
+        'Pertimbangkan masuk kategori produk baru',
+        'Perluas jangkauan geografis (jika online/delivery)',
+      ],
+      expectedImpact: `Potensi pertumbuhan revenue 30-50% dalam 3-6 bulan`,
+    });
+  }
+
+  return recommendations;
+}
+
+// Generate notifications based on business data
+export function generateNotifications(
+  products: Product[],
+  sales: Sale[],
+  settings: any
+): Array<Omit<import('./types').Notification, 'id' | 'createdAt'>> {
+  const notifications: Array<Omit<import('./types').Notification, 'id' | 'createdAt'>> = [];
+  const lowStockThreshold = settings?.notificationThreshold?.lowStockPercentage || 20;
+
+  // 1. Low Stock Alerts (stock below threshold)
+  const lowStockProducts = products.filter((p) => {
+    const stockPercentage = (p.stock / (p.stock + 50)) * 100; // Simple percentage calc
+    return stockPercentage <= lowStockThreshold && p.stock > 0;
+  });
+
+  lowStockProducts.forEach((product) => {
+    notifications.push({
+      userId: settings?.userId || '',
+      type: 'stock-alert',
+      title: '📦 Stok Menipis',
+      message: `${product.name} tinggal ${product.stock} unit. Segera restock!`,
+      priority: 'high',
+      icon: '📦',
+      metadata: {
+        productId: product.id,
+        productName: product.name,
+        value: product.stock,
+      },
+      read: false,
+      actionUrl: '/stok',
+      actionLabel: 'Lihat Stok',
+    });
+  });
+
+  // 2. Out of Stock Alerts
+  const outOfStockProducts = products.filter((p) => p.stock === 0);
+  outOfStockProducts.forEach((product) => {
+    notifications.push({
+      userId: settings?.userId || '',
+      type: 'stock-alert',
+      title: '❌ Stok Habis',
+      message: `${product.name} sudah habis. Pelanggan tidak bisa membeli!`,
+      priority: 'high',
+      icon: '❌',
+      metadata: {
+        productId: product.id,
+        productName: product.name,
+        value: 0,
+      },
+      read: false,
+      actionUrl: '/stok',
+      actionLabel: 'Lihat Stok',
+    });
+  });
+
+  // 3. Sales Trend Alert - Low/No sales
+  if (sales.length > 0) {
+    const totalSales = sales.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    if (totalSales < 5) {
+      notifications.push({
+        userId: settings?.userId || '',
+        type: 'sales-alert',
+        title: '⚠️ Penjualan Rendah',
+        message: `Total penjualan hanya ${totalSales} unit. Cek strategi penjualan Anda.`,
+        priority: 'medium',
+        icon: '⚠️',
+        read: false,
+        actionUrl: '/data',
+        actionLabel: 'Lihat Data Penjualan',
+      });
+    }
+  } else if (products.length > 0) {
+    // No sales recorded at all
+    notifications.push({
+      userId: settings?.userId || '',
+      type: 'sales-alert',
+      title: '⚠️ Belum Ada Penjualan',
+      message: 'Anda belum mencatat penjualan apapun. Mulai input data penjualan.',
+      priority: 'medium',
+      icon: '⚠️',
+      read: false,
+      actionUrl: '/data',
+      actionLabel: 'Input Penjualan',
+    });
+  }
+
+  // 4. System Info - Setup tips
+  if (products.length === 0) {
+    notifications.push({
+      userId: settings?.userId || '',
+      type: 'system',
+      title: '📊 Mulai dengan Menambah Produk',
+      message: 'Anda belum memiliki produk. Tambahkan produk untuk memulai analisis.',
+      priority: 'low',
+      icon: '📊',
+      read: false,
+      actionUrl: '/stok',
+      actionLabel: 'Tambah Produk Pertama',
+    });
+  } else if (products.length < 3) {
+    notifications.push({
+      userId: settings?.userId || '',
+      type: 'system',
+      title: '💡 Tips: Tambah Lebih Banyak Produk',
+      message: `Anda baru punya ${products.length} produk. Tambahkan lebih banyak untuk analisis yang lebih baik.`,
+      priority: 'low',
+      icon: '💡',
+      read: false,
+      actionUrl: '/stok',
+      actionLabel: 'Tambah Produk',
+    });
+  }
+
+  return notifications;
 }

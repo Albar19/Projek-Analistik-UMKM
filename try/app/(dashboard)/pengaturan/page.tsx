@@ -47,6 +47,12 @@ export default function PengaturanPage() {
   const [notifForm, setNotifForm] = useState({
     emailNotifications: false,
     notificationEmail: '',
+    stockAlertEnabled: true,
+    salesAlertEnabled: true,
+    predictionAlertEnabled: true,
+    systemNotificationsEnabled: true,
+    lowStockThreshold: 20,
+    salesDropThreshold: 20,
   });
 
   // Update form when settings loaded from cloud
@@ -69,6 +75,12 @@ export default function PengaturanPage() {
       setNotifForm({
         emailNotifications: settings.emailNotifications || settings.enableNotifications || false,
         notificationEmail: settings.notificationEmail || '',
+        stockAlertEnabled: true,
+        salesAlertEnabled: true,
+        predictionAlertEnabled: true,
+        systemNotificationsEnabled: true,
+        lowStockThreshold: settings.lowStockThreshold || settings.minStockAlert || 20,
+        salesDropThreshold: 20,
       });
     }
   }, [isLoading, settings]);
@@ -324,45 +336,207 @@ export default function PengaturanPage() {
             <Card>
               <h2 className="text-lg font-semibold text-slate-900 mb-6">Pengaturan Notifikasi</h2>
               <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-slate-900">Notifikasi Email</p>
-                    <p className="text-sm text-slate-500">Terima laporan harian via email</p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setNotifForm({ ...notifForm, emailNotifications: !notifForm.emailNotifications })
-                    }
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      notifForm.emailNotifications ? 'bg-blue-600' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                        notifForm.emailNotifications ? 'translate-x-7' : 'translate-x-1'
+                {/* Stock Alert */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="font-medium text-slate-900">📦 Alert Stok Produk</p>
+                      <p className="text-sm text-slate-500">Notifikasi ketika stok menipis atau habis</p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setNotifForm({
+                          ...notifForm,
+                          stockAlertEnabled: !notifForm.stockAlertEnabled,
+                        })
+                      }
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        notifForm.stockAlertEnabled ? 'bg-blue-600' : 'bg-slate-300'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          notifForm.stockAlertEnabled ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {notifForm.stockAlertEnabled && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">
+                          Ambang Stok Rendah: {notifForm.lowStockThreshold}%
+                        </label>
+                        <input
+                          type="range"
+                          min="5"
+                          max="50"
+                          value={notifForm.lowStockThreshold}
+                          onChange={(e) =>
+                            setNotifForm({
+                              ...notifForm,
+                              lowStockThreshold: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full mt-2"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {notifForm.emailNotifications && (
-                  <Input
-                    label="Email Notifikasi"
-                    type="email"
-                    value={notifForm.notificationEmail}
-                    onChange={(e) => setNotifForm({ ...notifForm, notificationEmail: e.target.value })}
-                    placeholder="email@example.com"
-                  />
-                )}
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                {/* Sales Alert */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <p className="font-medium text-yellow-800">Fitur dalam pengembangan</p>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        Notifikasi WhatsApp dan email scheduler akan segera tersedia.
-                      </p>
+                      <p className="font-medium text-slate-900">📊 Alert Penjualan</p>
+                      <p className="text-sm text-slate-500">Notifikasi jika tidak ada penjualan hari ini</p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setNotifForm({
+                          ...notifForm,
+                          salesAlertEnabled: !notifForm.salesAlertEnabled,
+                        })
+                      }
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        notifForm.salesAlertEnabled ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          notifForm.salesAlertEnabled ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {notifForm.salesAlertEnabled && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-slate-700">
+                          Ambang Penurunan Penjualan: {notifForm.salesDropThreshold}%
+                        </label>
+                        <input
+                          type="range"
+                          min="5"
+                          max="50"
+                          value={notifForm.salesDropThreshold}
+                          onChange={(e) =>
+                            setNotifForm({
+                              ...notifForm,
+                              salesDropThreshold: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full mt-2"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Prediction Alert */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-slate-900">🔮 Alert Prediksi</p>
+                      <p className="text-sm text-slate-500">Notifikasi untuk prediksi penjualan negatif</p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setNotifForm({
+                          ...notifForm,
+                          predictionAlertEnabled: !notifForm.predictionAlertEnabled,
+                        })
+                      }
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        notifForm.predictionAlertEnabled ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          notifForm.predictionAlertEnabled ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* System Notifications */}
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-slate-900">ℹ️ Notifikasi Sistem</p>
+                      <p className="text-sm text-slate-500">Update dan informasi penting lainnya</p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setNotifForm({
+                          ...notifForm,
+                          systemNotificationsEnabled: !notifForm.systemNotificationsEnabled,
+                        })
+                      }
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        notifForm.systemNotificationsEnabled ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          notifForm.systemNotificationsEnabled ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Email Notifications */}
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="font-medium text-slate-900">📧 Email Notifications</p>
+                    <button
+                      onClick={() =>
+                        setNotifForm({
+                          ...notifForm,
+                          emailNotifications: !notifForm.emailNotifications,
+                        })
+                      }
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        notifForm.emailNotifications ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          notifForm.emailNotifications ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {notifForm.emailNotifications && (
+                    <Input
+                      label="Email Notifikasi"
+                      type="email"
+                      value={notifForm.notificationEmail}
+                      onChange={(e) =>
+                        setNotifForm({
+                          ...notifForm,
+                          notificationEmail: e.target.value,
+                        })
+                      }
+                      placeholder="email@example.com"
+                    />
+                  )}
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="font-medium text-blue-900">💡 Tips Pengaturan Notifikasi</p>
+                      <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
+                        <li>Atur ambang batas sesuai kebutuhan bisnis Anda</li>
+                        <li>Email alert akan dikirim untuk alert kritis (stok habis, tidak ada penjualan)</li>
+                        <li>Disable notifikasi yang tidak perlu untuk mengurangi gangguan</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -428,7 +602,7 @@ export default function PengaturanPage() {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0" />
                     <div>
                       <p className="font-medium text-yellow-800">Fitur Multi-User</p>
                       <p className="text-sm text-yellow-700 mt-1">

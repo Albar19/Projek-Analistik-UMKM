@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { calculateDailySales, calculateProductSales } from '@/lib/data';
 import {
@@ -10,6 +10,7 @@ import {
   generateInsights,
   filterSalesByDateRange,
   getDateRange,
+  generateNotifications,
 } from '@/lib/utils';
 import { Card, StatCard, InsightCard, Badge } from '@/components/ui';
 import { SalesLineChart, SalesBarChart, ProductPieChart } from '@/components/charts/Charts';
@@ -28,11 +29,31 @@ import { Select } from '@/components/ui/Input';
 type TimeRange = '7' | '14' | '30';
 
 export default function DashboardPage() {
-  const { sales, products } = useStore();
+  const { sales, products, addNotification, notifications, notificationSettings } = useStore();
   const [timeRange, setTimeRange] = useState<TimeRange>('7');
   const [showNotifications, setShowNotifications] = useState(false);
 
   const days = parseInt(timeRange);
+
+  // Generate notifications on dashboard load
+  useEffect(() => {
+    if (products.length > 0) {
+      const newNotifications = generateNotifications(products, sales, notificationSettings);
+      
+      // Add all new notifications
+      newNotifications.forEach((notif) => {
+        const exists = notifications.some(
+          (n) =>
+            n.type === notif.type &&
+            n.metadata?.productId === notif.metadata?.productId &&
+            n.message === notif.message
+        );
+        if (!exists) {
+          addNotification(notif);
+        }
+      });
+    }
+  }, [products.length, sales.length]);
 
   // Calculate date ranges
   const { currentSales, previousSales } = useMemo(() => {
@@ -82,8 +103,8 @@ export default function DashboardPage() {
     value: p.totalRevenue,
   }));
 
-  // Notifications (sales changes)
-  const notifications = insights.filter(
+  // Notifications (sales changes from insights)
+  const insightNotifications = insights.filter(
     (i) => i.type === 'increase' || i.type === 'decrease' || i.type === 'anomaly'
   );
 
@@ -114,9 +135,9 @@ export default function DashboardPage() {
               className="relative"
             >
               <Bell size={18} />
-              {notifications.length > 0 && (
+              {insightNotifications.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {notifications.length}
+                  {insightNotifications.length}
                 </span>
               )}
             </Button>
@@ -126,10 +147,10 @@ export default function DashboardPage() {
                   <h3 className="font-semibold text-slate-900">Notifikasi</h3>
                 </div>
                 <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
+                  {insightNotifications.length === 0 ? (
                     <p className="p-4 text-sm text-slate-500">Tidak ada notifikasi</p>
                   ) : (
-                    notifications.map((notif, idx) => (
+                    insightNotifications.map((notif, idx) => (
                       <div key={idx} className="p-4 border-b border-slate-100 last:border-0">
                         <p className="text-sm font-medium text-slate-900">{notif.title}</p>
                         <p className="text-xs text-slate-500 mt-1">{notif.description}</p>

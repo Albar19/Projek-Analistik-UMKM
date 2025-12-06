@@ -63,6 +63,24 @@ export interface SalesPrediction {
   }[];
 }
 
+export interface PredictionRecommendation {
+  id: string;
+  type: 'restock' | 'price-adjustment' | 'promotion' | 'bundling' | 'discontinue' | 'expansion';
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  icon: string;
+  actionItems: string[];
+  expectedImpact: string;
+  productIds?: string[];
+  relatedProducts?: {
+    productId: string;
+    productName: string;
+    relevance: number;
+  }[];
+  estimatedRevenue?: number;
+}
+
 export interface StockAnalysis {
   productId: string;
   productName: string;
@@ -90,6 +108,41 @@ export interface ActivityLog {
   action: string;
   details: string;
   timestamp: Date;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'stock-alert' | 'sales-alert' | 'prediction-alert' | 'system' | 'recommendation';
+  title: string;
+  message: string;
+  priority: 'high' | 'medium' | 'low';
+  icon: string;
+  read: boolean;
+  actionUrl?: string;
+  actionLabel?: string;
+  metadata?: {
+    productId?: string;
+    productName?: string;
+    value?: number;
+    percentage?: number;
+  };
+  createdAt: Date;
+  readAt?: Date;
+}
+
+export interface NotificationSetting {
+  userId: string;
+  stockAlert: boolean;
+  salesAlert: boolean;
+  predictionAlert: boolean;
+  recommendationAlert: boolean;
+  emailNotification: boolean;
+  emailAddress?: string;
+  notificationThreshold?: {
+    lowStockPercentage: number; // e.g., 30 means alert when stock < 30%
+    salesDropPercentage: number; // e.g., 20 means alert when sales drop > 20%
+  };
 }
 
 export interface BusinessSettings {

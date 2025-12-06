@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, Sale, BusinessSettings, ChatMessage, ChatSession, ActivityLog, User } from './types';
+import { Product, Sale, BusinessSettings, ChatMessage, ChatSession, ActivityLog, User, Notification, NotificationSetting } from './types';
 
 // Default empty state for new users
 const getEmptyState = () => ({
@@ -24,6 +24,8 @@ const getEmptyState = () => ({
   } as BusinessSettings,
   chatHistory: [] as ChatMessage[],
   chatSessions: [] as ChatSession[],
+  notifications: [] as Notification[],
+  notificationSettings: {} as NotificationSetting,
   activityLogs: [] as ActivityLog[],
 });
 
@@ -38,6 +40,8 @@ interface AppState {
   chatHistory: ChatMessage[];
   chatSessions: ChatSession[];
   currentChatSessionId: string | null;
+  notifications: Notification[];
+  notificationSettings: NotificationSetting;
   activityLogs: ActivityLog[];
   currentUser: User | null;
   isLoading: boolean;
@@ -57,6 +61,15 @@ interface AppState {
   addManySales: (sales: Sale[]) => void;
   updateSale: (id: string, updates: Partial<Sale>) => void;
   deleteSale: (id: string) => void;
+  
+  // Actions - Notifications
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
+  markNotificationAsRead: (notificationId: string) => void;
+  markAllNotificationsAsRead: () => void;
+  deleteNotification: (notificationId: string) => void;
+  clearOldNotifications: (daysOld: number) => void;
+  updateNotificationSettings: (settings: Partial<NotificationSetting>) => void;
+  getUnreadCount: () => number;
   
   // Actions - Settings
   updateSettings: (settings: Partial<BusinessSettings>) => void;
@@ -107,6 +120,20 @@ export const useStore = create<AppState>()((set, get) => ({
   chatHistory: [],
   chatSessions: [],
   currentChatSessionId: null,
+  notifications: [],
+  notificationSettings: {
+    userId: '',
+    stockAlert: true,
+    salesAlert: true,
+    predictionAlert: true,
+    recommendationAlert: true,
+    emailNotification: false,
+    emailAddress: '',
+    notificationThreshold: {
+      lowStockPercentage: 20,
+      salesDropPercentage: 20,
+    },
+  },
   activityLogs: [],
   currentUser: null,
   isLoading: false,
@@ -420,6 +447,87 @@ export const useStore = create<AppState>()((set, get) => ({
   
   setCurrentChatSession: (sessionId: string | null) => {
     set({ currentChatSessionId: sessionId });
+  },
+  
+  // Notifications
+  addNotification: (notification) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+    };
+    set((state) => {
+      const newNotifications = [newNotification, ...state.notifications].slice(0, 50);
+      if (state.currentUserId) {
+        localStorage.setItem(`notifications_${state.currentUserId}`, JSON.stringify(newNotifications));
+      }
+      return { notifications: newNotifications };
+    });
+  },
+  
+  markNotificationAsRead: (notificationId: string) => {
+    set((state) => {
+      const newNotifications = state.notifications.map((notif) =>
+        notif.id === notificationId
+          ? { ...notif, read: true, readAt: new Date() }
+          : notif
+      );
+      if (state.currentUserId) {
+        localStorage.setItem(`notifications_${state.currentUserId}`, JSON.stringify(newNotifications));
+      }
+      return { notifications: newNotifications };
+    });
+  },
+  
+  markAllNotificationsAsRead: () => {
+    set((state) => {
+      const newNotifications = state.notifications.map((notif) => ({
+        ...notif,
+        read: true,
+        readAt: new Date(),
+      }));
+      if (state.currentUserId) {
+        localStorage.setItem(`notifications_${state.currentUserId}`, JSON.stringify(newNotifications));
+      }
+      return { notifications: newNotifications };
+    });
+  },
+  
+  deleteNotification: (notificationId: string) => {
+    set((state) => {
+      const newNotifications = state.notifications.filter((n) => n.id !== notificationId);
+      if (state.currentUserId) {
+        localStorage.setItem(`notifications_${state.currentUserId}`, JSON.stringify(newNotifications));
+      }
+      return { notifications: newNotifications };
+    });
+  },
+  
+  clearOldNotifications: (daysOld: number) => {
+    set((state) => {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+      const newNotifications = state.notifications.filter((n) => new Date(n.createdAt) > cutoffDate);
+      if (state.currentUserId) {
+        localStorage.setItem(`notifications_${state.currentUserId}`, JSON.stringify(newNotifications));
+      }
+      return { notifications: newNotifications };
+    });
+  },
+  
+  updateNotificationSettings: (settings) => {
+    set((state) => {
+      const newSettings = { ...state.notificationSettings, ...settings };
+      if (state.currentUserId) {
+        localStorage.setItem(`notificationSettings_${state.currentUserId}`, JSON.stringify(newSettings));
+      }
+      return { notificationSettings: newSettings };
+    });
+  },
+  
+  getUnreadCount: () => {
+    const state = get();
+    return state.notifications.filter((n) => !n.read).length;
   },
   
   // Activity Log - stored in memory only

@@ -7,6 +7,7 @@ import {
   formatCurrency,
   formatNumber,
   generatePrediction,
+  generateRecommendations,
   filterSalesByDateRange,
   getDateRange,
 } from '@/lib/utils';
@@ -22,14 +23,19 @@ import {
   BarChart3,
   Sparkles,
   RefreshCw,
+  ChevronRight,
+  AlertCircle,
+  CheckCircle2,
+  PackageOpen,
 } from 'lucide-react';
 
 type PredictionPeriod = 'daily' | 'weekly' | 'monthly';
 
 export default function PrediksiPage() {
-  const { sales } = useStore();
+  const { sales, products } = useStore();
   const [period, setPeriod] = useState<PredictionPeriod>('weekly');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [expandedRecommendation, setExpandedRecommendation] = useState<string | null>(null);
 
   // Calculate data
   const { start, end } = getDateRange(30);
@@ -41,6 +47,12 @@ export default function PrediksiPage() {
   const prediction = useMemo(
     () => generatePrediction(dailySales, productSales, period),
     [dailySales, productSales, period]
+  );
+
+  // Generate recommendations
+  const recommendations = useMemo(
+    () => generateRecommendations(prediction, products, productSales),
+    [prediction, products, productSales]
   );
 
   // Trend icon
@@ -93,6 +105,32 @@ export default function PrediksiPage() {
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 1500);
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-100 text-red-700 border-red-200';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'low':
+        return 'bg-blue-100 text-blue-700 border-blue-200';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return '🔴 Prioritas Tinggi';
+      case 'medium':
+        return '🟡 Prioritas Sedang';
+      case 'low':
+        return '🟢 Prioritas Rendah';
+      default:
+        return 'Prioritas';
+    }
   };
 
   return (
@@ -296,6 +334,104 @@ export default function PrediksiPage() {
             <p className="text-sm text-slate-500 mt-1">Hari data historis</p>
           </div>
         </Card>
+      </div>
+
+      {/* AI Recommendations */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-semibold text-slate-900">💡 Rekomendasi AI</h2>
+          <Badge variant="default" className="ml-auto">
+            {recommendations.length} saran
+          </Badge>
+        </div>
+
+        {recommendations.length === 0 ? (
+          <Card className="text-center py-8">
+            <PackageOpen className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+            <p className="text-slate-600">Tidak ada rekomendasi saat ini. Data yang tersedia masih terbatas.</p>
+          </Card>
+        ) : (
+          <div className="grid gap-3">
+            {recommendations.map((rec) => (
+              <div
+                key={rec.id}
+                onClick={() =>
+                  setExpandedRecommendation(
+                    expandedRecommendation === rec.id ? null : rec.id
+                  )
+                }
+                className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 ${getPriorityColor(
+                  rec.priority
+                )}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">{rec.icon}</span>
+                      <h3 className="font-semibold text-slate-900">{rec.title}</h3>
+                      <span className="text-xs px-2 py-1 bg-white/50 rounded-full whitespace-nowrap">
+                        {getPriorityLabel(rec.priority)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-700 mb-2">{rec.description}</p>
+
+                    {expandedRecommendation === rec.id && (
+                      <div className="mt-3 space-y-2 border-t pt-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-900 mb-2">
+                            📋 Langkah yang Dapat Dilakukan:
+                          </h4>
+                          <ul className="space-y-1">
+                            {rec.actionItems.map((item, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
+                                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="border-t pt-2">
+                          <h4 className="text-sm font-semibold text-slate-900 mb-1">
+                            📈 Expected Impact:
+                          </h4>
+                          <p className="text-sm text-slate-700">{rec.expectedImpact}</p>
+                        </div>
+
+                        {rec.relatedProducts && rec.relatedProducts.length > 0 && (
+                          <div className="border-t pt-2">
+                            <h4 className="text-sm font-semibold text-slate-900 mb-2">
+                              📦 Produk Terkait:
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {rec.relatedProducts.map((prod) => (
+                                <span
+                                  key={prod.productId}
+                                  className="text-xs bg-white/50 px-2 py-1 rounded-full"
+                                >
+                                  {prod.productName} ({prod.relevance.toFixed(0)}%)
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center shrink-0">
+                    <ChevronRight
+                      className={`w-5 h-5 transition-transform ${
+                        expandedRecommendation === rec.id ? 'rotate-90' : ''
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Disclaimer */}
