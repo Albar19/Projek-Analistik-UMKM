@@ -10,10 +10,25 @@ export async function GET() {
     }
 
     // Get user ID
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    let userResult: any[] = [];
+
+    if (!isUuid) {
+      userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      ) as any[];
+    } else {
+      // If we have UUID, we still need to check if user exists? 
+      // Or just assume? The original code returned default settings if user not found.
+      // Let's verify existence if we want to be 100% sure, but for optimization we skip it.
+      // However, the original code used `userResult` to determine if we should return default settings.
+      // If I skip the query, I need to make sure I handle the "user not found" case correctly.
+      // But if session has UUID, user must exist (unless deleted).
+      // Let's just set userResult to simulate found user if isUuid is true.
+      userResult = [{ id: userId }];
+    }
 
     const defaultSettings = {
       storeName: `Toko ${session.user.name || 'Saya'}`,
@@ -40,7 +55,9 @@ export async function GET() {
       });
     }
 
-    const userId = (userResult[0] as any).id;
+    if (!isUuid) {
+        userId = (userResult[0] as any).id;
+    }
     console.log('📊 Loading data for userId:', userId, 'email:', session.user.email);
 
     // Fetch products, sales, and settings in parallel

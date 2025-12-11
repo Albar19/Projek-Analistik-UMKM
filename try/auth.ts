@@ -81,14 +81,24 @@ const config = {
       return true;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub as string;
+      if (session.user && token.id) {
+        session.user.id = token.id as string;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        try {
+          const userResult = await query(
+            'SELECT id FROM users WHERE email = ?',
+            [user.email!]
+          );
+          if (Array.isArray(userResult) && userResult.length > 0) {
+            token.id = (userResult[0] as any).id;
+          }
+        } catch (error) {
+          console.error("Error fetching user ID in jwt callback:", error);
+        }
       }
       return token;
     },

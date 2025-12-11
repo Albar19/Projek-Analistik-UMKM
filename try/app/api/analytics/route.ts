@@ -12,16 +12,21 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30');
 
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 
-    if (!Array.isArray(userResult) || userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!isUuid) {
+      const userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      );
+
+      if (!Array.isArray(userResult) || userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      userId = (userResult[0] as any).id;
     }
-
-    const userId = (userResult[0] as any).id;
 
     // Calculate date range
     const startDate = new Date();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { auth } from '@/auth';
 
 // Create transporter for email sending
 const createTransporter = () => {
@@ -32,6 +33,11 @@ const createTransporter = () => {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { recipientEmail, reportHTML, reportSubject } = await request.json();
 
     // Validate inputs

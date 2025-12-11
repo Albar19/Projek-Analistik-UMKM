@@ -15,16 +15,21 @@ export async function GET(
 
     const { id } = await params;
 
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 
-    if (!Array.isArray(userResult) || userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!isUuid) {
+      const userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      );
+
+      if (!Array.isArray(userResult) || userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      userId = (userResult[0] as any).id;
     }
-
-    const userId = (userResult[0] as any).id;
 
     const product = await query(
       'SELECT * FROM products WHERE id = ? AND userId = ?',
@@ -56,16 +61,21 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 
-    if (!Array.isArray(userResult) || userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!isUuid) {
+      const userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      );
+
+      if (!Array.isArray(userResult) || userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      userId = (userResult[0] as any).id;
     }
-
-    const userId = (userResult[0] as any).id;
 
     // Build dynamic update query
     const updates: string[] = [];
@@ -139,16 +149,21 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 
-    if (!Array.isArray(userResult) || userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!isUuid) {
+      const userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      );
+
+      if (!Array.isArray(userResult) || userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      userId = (userResult[0] as any).id;
     }
-
-    const userId = (userResult[0] as any).id;
 
     await query(
       'DELETE FROM products WHERE id = ? AND userId = ?',

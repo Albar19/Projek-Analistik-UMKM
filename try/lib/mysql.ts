@@ -85,7 +85,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS products (
         id VARCHAR(36) PRIMARY KEY,
         userId VARCHAR(36) NOT NULL,
-        name VARCHAR(255) NOT NULL UNIQUE,
+        name VARCHAR(255) NOT NULL,
         category VARCHAR(100),
         price INT NOT NULL,
         costPrice INT NOT NULL,
@@ -95,10 +95,29 @@ export async function initializeDatabase() {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY idx_user_product_name (userId, name),
         INDEX idx_userId (userId),
         INDEX idx_category (category)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // Fix for existing products table with global unique name constraint
+    try {
+      // Check if 'name' index exists and is unique
+      const [indexes] = await connection.execute(
+        `SHOW INDEX FROM products WHERE Key_name = 'name'`
+      ) as any;
+
+      if (indexes && indexes.length > 0) {
+        console.log('🔄 Fixing products table schema (removing global unique name)...');
+        await connection.execute(`ALTER TABLE products DROP INDEX name`);
+        await connection.execute(`ALTER TABLE products ADD UNIQUE INDEX idx_user_product_name (userId, name)`);
+        console.log('✅ Products table schema fixed');
+      }
+    } catch (error) {
+      // Ignore error if index doesn't exist or other issues
+      // console.log('ℹ️ Products table schema check skipped or failed:', (error as Error).message);
+    }
 
     // Create sales table
     await connection.execute(`

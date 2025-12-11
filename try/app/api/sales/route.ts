@@ -14,16 +14,21 @@ export async function GET(request: Request) {
     const days = parseInt(searchParams.get('days') || '30');
     const productId = searchParams.get('productId');
 
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 
-    if (!Array.isArray(userResult) || userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!isUuid) {
+      const userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      );
+
+      if (!Array.isArray(userResult) || userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      userId = (userResult[0] as any).id;
     }
-
-    const userId = (userResult[0] as any).id;
 
     // Calculate date range
     const startDate = new Date();
@@ -86,16 +91,32 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const userResult = await query(
-      'SELECT id FROM users WHERE email = ?',
-      [session.user.email]
-    );
+    let userId = session.user.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 
-    if (!Array.isArray(userResult) || userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!isUuid) {
+      const userResult = await query(
+        'SELECT id FROM users WHERE email = ?',
+        [session.user.email]
+      );
+
+      if (!Array.isArray(userResult) || userResult.length === 0) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      userId = (userResult[0] as any).id;
     }
 
-    const userId = (userResult[0] as any).id;
+    // Validate product ownership
+    const productCheck = await query(
+      'SELECT id FROM products WHERE id = ? AND userId = ?',
+      [body.productId, userId]
+    );
+
+    if (!Array.isArray(productCheck) || productCheck.length === 0) {
+      return NextResponse.json({ error: 'Product not found or does not belong to user' }, { status: 400 });
+    }
+
     const id = uuidv4();
 
     await query(
